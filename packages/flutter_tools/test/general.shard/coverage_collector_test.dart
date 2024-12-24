@@ -5,7 +5,7 @@
 import 'dart:convert' show jsonEncode;
 import 'dart:io' show Directory, File;
 
-import 'package:coverage/src/hitmap.dart';
+import 'package:coverage/coverage.dart' show HitMap;
 import 'package:file/memory.dart';
 import 'package:flutter_tools/src/base/file_system.dart' show FileSystem;
 import 'package:flutter_tools/src/test/coverage_collector.dart';
@@ -33,14 +33,15 @@ void main() {
             ]
           ).toJson(),
         ),
-        FakeVmServiceRequest(
-          method: 'getVersion',
-          jsonResponse: Version(major: 3, minor: 51).toJson(),
-        ),
         const FakeVmServiceRequest(
-          method: 'getScripts',
+          method: 'getSourceReport',
           args: <String, Object>{
             'isolateId': '1',
+            'reports': <Object>['Coverage'],
+            'forceCompile': true,
+            'reportLines': true,
+            'libraryFilters': <Object>['package:foo/'],
+            'librariesAlreadyCompiled': <Object>[],
           },
           jsonResponse: <String, Object>{
             'type': 'Sentinel',
@@ -53,6 +54,7 @@ void main() {
       Uri(),
       <String>{'foo'},
       serviceOverride: fakeVmServiceHost.vmService,
+      coverableLineCache: <String, Set<int>>{},
     );
 
     expect(result, <String, Object>{'type': 'CodeCoverage', 'coverage': <Object>[]});
@@ -73,27 +75,14 @@ void main() {
           ).toJson(),
         ),
         FakeVmServiceRequest(
-          method: 'getVersion',
-          jsonResponse: Version(major: 3, minor: 51).toJson(),
-        ),
-        FakeVmServiceRequest(
-          method: 'getScripts',
-          args: <String, Object>{
-            'isolateId': '1',
-          },
-          jsonResponse: ScriptList(scripts: <ScriptRef>[
-            ScriptRef(uri: 'package:foo/foo.dart', id: '1'),
-            ScriptRef(uri: 'package:bar/bar.dart', id: '2'),
-          ]).toJson(),
-        ),
-        FakeVmServiceRequest(
           method: 'getSourceReport',
           args: <String, Object>{
             'isolateId': '1',
             'reports': <Object>['Coverage'],
-            'scriptId': '1',
             'forceCompile': true,
             'reportLines': true,
+            'libraryFilters': <Object>['package:foo/'],
+            'librariesAlreadyCompiled': <Object>[],
           },
           jsonResponse: SourceReport(
             ranges: <SourceReportRange>[
@@ -123,6 +112,7 @@ void main() {
       Uri(),
       <String>{'foo'},
       serviceOverride: fakeVmServiceHost.vmService,
+      coverableLineCache: <String, Set<int>>{},
     );
 
     expect(result, <String, Object>{
@@ -151,6 +141,7 @@ void main() {
       Uri(),
       null,
       serviceOverride: fakeVmServiceHost.vmService,
+      coverableLineCache: <String, Set<int>>{},
     );
 
     expect(result, <String, Object>{
@@ -197,10 +188,6 @@ void main() {
           ).toJson(),
         ),
         FakeVmServiceRequest(
-          method: 'getVersion',
-          jsonResponse: Version(major: 3, minor: 57).toJson(),
-        ),
-        FakeVmServiceRequest(
           method: 'getSourceReport',
           args: <String, Object>{
             'isolateId': '1',
@@ -208,6 +195,7 @@ void main() {
             'forceCompile': true,
             'reportLines': true,
             'libraryFilters': <Object>['package:foo/'],
+            'librariesAlreadyCompiled': <Object>[],
           },
           jsonResponse: SourceReport(
             ranges: <SourceReportRange>[
@@ -237,6 +225,7 @@ void main() {
       Uri(),
       <String>{'foo'},
       serviceOverride: fakeVmServiceHost.vmService,
+      coverableLineCache: <String, Set<int>>{},
     );
 
     expect(result, <String, Object>{
@@ -272,16 +261,13 @@ void main() {
           ).toJson(),
         ),
         FakeVmServiceRequest(
-          method: 'getVersion',
-          jsonResponse: Version(major: 3, minor: 57).toJson(),
-        ),
-        FakeVmServiceRequest(
           method: 'getSourceReport',
           args: <String, Object>{
             'isolateId': '1',
             'reports': <Object>['Coverage'],
             'forceCompile': true,
             'reportLines': true,
+            'librariesAlreadyCompiled': <Object>[],
           },
           jsonResponse: SourceReport(
             ranges: <SourceReportRange>[
@@ -311,6 +297,7 @@ void main() {
       Uri(),
       null,
       serviceOverride: fakeVmServiceHost.vmService,
+      coverableLineCache: <String, Set<int>>{},
     );
 
     expect(result, <String, Object>{
@@ -346,27 +333,14 @@ void main() {
           ).toJson(),
         ),
         FakeVmServiceRequest(
-          method: 'getVersion',
-          jsonResponse: Version(major: 3, minor: 56).toJson(),
-        ),
-        FakeVmServiceRequest(
-          method: 'getScripts',
-          args: <String, Object>{
-            'isolateId': '1',
-          },
-          jsonResponse: ScriptList(scripts: <ScriptRef>[
-            ScriptRef(uri: 'package:foo/foo.dart', id: '1'),
-            ScriptRef(uri: 'package:bar/bar.dart', id: '2'),
-          ]).toJson(),
-        ),
-        FakeVmServiceRequest(
           method: 'getSourceReport',
           args: <String, Object>{
             'isolateId': '1',
             'reports': <Object>['Coverage', 'BranchCoverage'],
-            'scriptId': '1',
             'forceCompile': true,
             'reportLines': true,
+            'libraryFilters': <Object>['package:foo/'],
+            'librariesAlreadyCompiled': <Object>[],
           },
           jsonResponse: SourceReport(
             ranges: <SourceReportRange>[
@@ -401,6 +375,7 @@ void main() {
       <String>{'foo'},
       serviceOverride: fakeVmServiceHost.vmService,
       branchCoverage: true,
+      coverableLineCache: <String, Set<int>>{},
     );
 
     expect(result, <String, Object>{
@@ -476,7 +451,10 @@ void main() {
       fooFile.deleteSync();
       await collector.collectCoverage(
           TestTestDevice(),
-          serviceOverride: createFakeVmServiceHostWithFooAndBar(libraryFilters: <String>['package:foo/', 'package:bar/']).vmService,
+          serviceOverride: createFakeVmServiceHostWithFooAndBar(
+              libraryFilters: <String>['package:foo/', 'package:bar/'],
+              librariesAlreadyCompiled: <String>['package:foo/foo.dart', 'package:bar/bar.dart'],
+          ).vmService,
         );
       await getHitMapAndVerify();
     } finally {
@@ -601,6 +579,171 @@ void main() {
       tempDir?.deleteSync(recursive: true);
     }
   });
+
+  testWithoutContext('Coverage collector fills coverableLineCache', () async {
+    final FakeVmServiceHost fakeVmServiceHost = FakeVmServiceHost(
+      requests: <VmServiceExpectation>[
+        FakeVmServiceRequest(
+          method: 'getVM',
+          jsonResponse: (VM.parse(<String, Object>{})!
+            ..isolates = <IsolateRef>[
+              IsolateRef.parse(<String, Object>{
+                'id': '1',
+              })!,
+            ]
+          ).toJson(),
+        ),
+        FakeVmServiceRequest(
+          method: 'getSourceReport',
+          args: <String, Object>{
+            'isolateId': '1',
+            'reports': <Object>['Coverage'],
+            'forceCompile': true,
+            'reportLines': true,
+            'libraryFilters': <String>['package:foo/'],
+            'librariesAlreadyCompiled': <String>[],
+          },
+          jsonResponse: SourceReport(
+            ranges: <SourceReportRange>[
+              SourceReportRange(
+                scriptIndex: 0,
+                startPos: 0,
+                endPos: 0,
+                compiled: true,
+                coverage: SourceReportCoverage(
+                  hits: <int>[1, 3],
+                  misses: <int>[2],
+                ),
+              ),
+            ],
+            scripts: <ScriptRef>[
+              ScriptRef(
+                uri: 'package:foo/foo.dart',
+                id: '1',
+              ),
+            ],
+          ).toJson(),
+        ),
+      ],
+    );
+
+    final Map<String, Set<int>> coverableLineCache = <String, Set<int>>{};
+    final Map<String, Object?> result = await collect(
+      Uri(),
+      <String>{'foo'},
+      serviceOverride: fakeVmServiceHost.vmService,
+      coverableLineCache: coverableLineCache,
+    );
+
+    expect(result, <String, Object>{
+      'type': 'CodeCoverage',
+      'coverage': <Object>[
+        <String, Object>{
+          'source': 'package:foo/foo.dart',
+          'script': <String, Object>{
+            'type': '@Script',
+            'fixedId': true,
+            'id': 'libraries/1/scripts/package%3Afoo%2Ffoo.dart',
+            'uri': 'package:foo/foo.dart',
+            '_kind': 'library',
+          },
+          'hits': <Object>[1, 1, 3, 1, 2, 0],
+        },
+      ],
+    });
+
+    // coverableLineCache should contain every line mentioned in the report.
+    expect(coverableLineCache, <String, Set<int>>{
+      'package:foo/foo.dart': <int>{1, 2, 3},
+    });
+
+    expect(fakeVmServiceHost.hasRemainingExpectations, false);
+  });
+
+  testWithoutContext('Coverage collector avoids recompiling libraries in coverableLineCache', () async {
+    final FakeVmServiceHost fakeVmServiceHost = FakeVmServiceHost(
+      requests: <VmServiceExpectation>[
+        FakeVmServiceRequest(
+          method: 'getVM',
+          jsonResponse: (VM.parse(<String, Object>{})!
+            ..isolates = <IsolateRef>[
+              IsolateRef.parse(<String, Object>{
+                'id': '1',
+              })!,
+            ]
+          ).toJson(),
+        ),
+
+        // This collection sets librariesAlreadyCompiled. The response doesn't
+        // include any misses.
+        FakeVmServiceRequest(
+          method: 'getSourceReport',
+          args: <String, Object>{
+            'isolateId': '1',
+            'reports': <Object>['Coverage'],
+            'forceCompile': true,
+            'reportLines': true,
+            'libraryFilters': <String>['package:foo/'],
+            'librariesAlreadyCompiled': <String>['package:foo/foo.dart'],
+          },
+          jsonResponse: SourceReport(
+            ranges: <SourceReportRange>[
+              SourceReportRange(
+                scriptIndex: 0,
+                startPos: 0,
+                endPos: 0,
+                compiled: true,
+                coverage: SourceReportCoverage(
+                  hits: <int>[1, 3],
+                  misses: <int>[],
+                ),
+              ),
+            ],
+            scripts: <ScriptRef>[
+              ScriptRef(
+                uri: 'package:foo/foo.dart',
+                id: '1',
+              ),
+            ],
+          ).toJson(),
+        ),
+      ],
+    );
+
+    final Map<String, Set<int>> coverableLineCache = <String, Set<int>>{
+      'package:foo/foo.dart': <int>{1, 2, 3},
+    };
+    final Map<String, Object?> result2 = await collect(
+      Uri(),
+      <String>{'foo'},
+      serviceOverride: fakeVmServiceHost.vmService,
+      coverableLineCache: coverableLineCache,
+    );
+
+    // Expect that line 2 is marked as missed, even though it wasn't mentioned
+    // in the getSourceReport response.
+    expect(result2, <String, Object>{
+      'type': 'CodeCoverage',
+      'coverage': <Object>[
+        <String, Object>{
+          'source': 'package:foo/foo.dart',
+          'script': <String, Object>{
+            'type': '@Script',
+            'fixedId': true,
+            'id': 'libraries/1/scripts/package%3Afoo%2Ffoo.dart',
+            'uri': 'package:foo/foo.dart',
+            '_kind': 'library',
+          },
+          'hits': <Object>[1, 1, 2, 0, 3, 1],
+        },
+      ],
+    });
+    expect(coverableLineCache, <String, Set<int>>{
+      'package:foo/foo.dart': <int>{1, 2, 3},
+    });
+
+    expect(fakeVmServiceHost.hasRemainingExpectations, false);
+  });
 }
 
 File writeFooBarPackagesJson(Directory tempDir) {
@@ -623,6 +766,7 @@ File writeFooBarPackagesJson(Directory tempDir) {
 
 FakeVmServiceHost createFakeVmServiceHostWithFooAndBar({
     List<String>? libraryFilters,
+    List<String> librariesAlreadyCompiled = const <String>[],
   }) {
   return FakeVmServiceHost(
     requests: <VmServiceExpectation>[
@@ -637,16 +781,13 @@ FakeVmServiceHost createFakeVmServiceHostWithFooAndBar({
         ).toJson(),
       ),
       FakeVmServiceRequest(
-        method: 'getVersion',
-        jsonResponse: Version(major: 3, minor: 61).toJson(),
-      ),
-      FakeVmServiceRequest(
         method: 'getSourceReport',
         args: <String, Object>{
           'isolateId': '1',
           'reports': <Object>['Coverage'],
           'forceCompile': true,
           'reportLines': true,
+          'librariesAlreadyCompiled': librariesAlreadyCompiled,
           if (libraryFilters != null) 'libraryFilters': libraryFilters,
         },
         jsonResponse: SourceReport(

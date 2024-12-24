@@ -60,7 +60,7 @@ class _AsyncAutocompleteState extends State<_AsyncAutocomplete > {
   // Whether to consider the fake network to be offline.
   bool _networkEnabled = true;
 
-  // A network error was recieved on the most recent query.
+  // A network error was received on the most recent query.
   bool _networkError = false;
 
   // Calls the "remote" API to search with the given query. Returns null when
@@ -71,14 +71,13 @@ class _AsyncAutocompleteState extends State<_AsyncAutocomplete > {
     late final Iterable<String> options;
     try {
       options = await _FakeAPI.search(_currentQuery!, _networkEnabled);
-    } catch (error) {
-      if (error is _NetworkException) {
+    } on _NetworkException {
+      if (mounted) {
         setState(() {
           _networkError = true;
         });
-        return <String>[];
       }
-      rethrow;
+      return <String>[];
     }
 
     // If another search happened after this one, throw away these options.
@@ -189,11 +188,8 @@ _Debounceable<S, T> _debounce<S, T>(_Debounceable<S?, T> function) {
     debounceTimer = _DebounceTimer();
     try {
       await debounceTimer!.future;
-    } catch (error) {
-      if (error is _CancelException) {
-        return null;
-      }
-      rethrow;
+    } on _CancelException {
+      return null;
     }
     return function(parameter);
   };

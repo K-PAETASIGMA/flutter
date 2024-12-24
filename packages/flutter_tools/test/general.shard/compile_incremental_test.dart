@@ -30,8 +30,7 @@ void main() {
   late FakeProcessManager fakeProcessManager;
 
   const List<String> frontendServerCommand = <String>[
-    'Artifact.engineDartBinary',
-    '--disable-dart-dev',
+    'Artifact.engineDartAotRuntime',
     'Artifact.frontendServerSnapshotForEngineDartSdk',
     '--sdk-root',
     'sdkroot/',

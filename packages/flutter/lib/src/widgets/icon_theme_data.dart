@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/cupertino.dart';
+/// @docImport 'package:flutter/material.dart';
+///
+/// @docImport 'icon.dart';
+/// @docImport 'icon_theme.dart';
+library;
+
 import 'dart:ui' as ui show lerpDouble;
 
 import 'package:flutter/foundation.dart';
@@ -31,6 +38,7 @@ class IconThemeData with Diagnosticable {
     this.color,
     double? opacity,
     this.shadows,
+    this.applyTextScaling,
   }) : _opacity = opacity,
        assert(fill == null || (0.0 <= fill && fill <= 1.0)),
        assert(weight == null || (0.0 < weight)),
@@ -48,7 +56,8 @@ class IconThemeData with Diagnosticable {
         opticalSize = 48.0,
         color = const Color(0xFF000000),
         _opacity = 1.0,
-        shadows = null;
+        shadows = null,
+        applyTextScaling = false;
 
   /// Creates a copy of this icon theme but with the given fields replaced with
   /// the new values.
@@ -61,6 +70,7 @@ class IconThemeData with Diagnosticable {
     Color? color,
     double? opacity,
     List<Shadow>? shadows,
+    bool? applyTextScaling,
   }) {
     return IconThemeData(
       size: size ?? this.size,
@@ -71,6 +81,7 @@ class IconThemeData with Diagnosticable {
       color: color ?? this.color,
       opacity: opacity ?? this.opacity,
       shadows: shadows ?? this.shadows,
+      applyTextScaling: applyTextScaling ?? this.applyTextScaling,
     );
   }
 
@@ -90,6 +101,7 @@ class IconThemeData with Diagnosticable {
       color: other.color,
       opacity: other.opacity,
       shadows: other.shadows,
+      applyTextScaling: other.applyTextScaling,
     );
   }
 
@@ -118,7 +130,8 @@ class IconThemeData with Diagnosticable {
     && grade != null
     && opticalSize != null
     && color != null
-    && opacity != null;
+    && opacity != null
+    && applyTextScaling != null;
 
   /// The default for [Icon.size].
   ///
@@ -163,6 +176,9 @@ class IconThemeData with Diagnosticable {
   /// The default for [Icon.shadows].
   final List<Shadow>? shadows;
 
+  /// The default for [Icon.applyTextScaling].
+  final bool? applyTextScaling;
+
   /// Linearly interpolate between two icon theme data objects.
   ///
   /// {@macro dart.ui.shadow.lerp}
@@ -179,6 +195,7 @@ class IconThemeData with Diagnosticable {
       color: Color.lerp(a?.color, b?.color, t),
       opacity: ui.lerpDouble(a?.opacity, b?.opacity, t),
       shadows: Shadow.lerpList(a?.shadows, b?.shadows, t),
+      applyTextScaling: t < 0.5 ? a?.applyTextScaling : b?.applyTextScaling,
     );
   }
 
@@ -195,7 +212,8 @@ class IconThemeData with Diagnosticable {
         && other.opticalSize == opticalSize
         && other.color == color
         && other.opacity == opacity
-        && listEquals(other.shadows, shadows);
+        && listEquals(other.shadows, shadows)
+        && other.applyTextScaling == applyTextScaling;
   }
 
   @override
@@ -208,6 +226,7 @@ class IconThemeData with Diagnosticable {
     color,
     opacity,
     shadows == null ? null : Object.hashAll(shadows!),
+    applyTextScaling,
   );
 
   @override
@@ -221,5 +240,6 @@ class IconThemeData with Diagnosticable {
     properties.add(ColorProperty('color', color, defaultValue: null));
     properties.add(DoubleProperty('opacity', opacity, defaultValue: null));
     properties.add(IterableProperty<Shadow>('shadows', shadows, defaultValue: null));
+    properties.add(DiagnosticsProperty<bool>('applyTextScaling', applyTextScaling, defaultValue: null));
   }
 }

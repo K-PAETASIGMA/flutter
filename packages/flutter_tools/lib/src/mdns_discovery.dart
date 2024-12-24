@@ -6,6 +6,7 @@ import 'dart:async';
 
 import 'package:meta/meta.dart';
 import 'package:multicast_dns/multicast_dns.dart';
+import 'package:unified_analytics/unified_analytics.dart';
 
 import 'base/common.dart';
 import 'base/context.dart';
@@ -14,6 +15,7 @@ import 'base/logger.dart';
 import 'build_info.dart';
 import 'convert.dart';
 import 'device.dart';
+import 'globals.dart' as globals;
 import 'reporting/reporting.dart';
 
 /// A wrapper around [MDnsClient] to find a Dart VM Service instance.
@@ -26,10 +28,12 @@ class MDnsVmServiceDiscovery {
     MDnsClient? preliminaryMDnsClient,
     required Logger logger,
     required Usage flutterUsage,
+    required Analytics analytics,
   })  : _client = mdnsClient ?? MDnsClient(),
         _preliminaryClient = preliminaryMDnsClient,
         _logger = logger,
-        _flutterUsage = flutterUsage;
+        _flutterUsage = flutterUsage,
+        _analytics = analytics;
 
   final MDnsClient _client;
 
@@ -39,6 +43,7 @@ class MDnsVmServiceDiscovery {
 
   final Logger _logger;
   final Usage _flutterUsage;
+  final Analytics _analytics;
 
   @visibleForTesting
   static const String dartVmServiceName = '_dartVmService._tcp.local';
@@ -225,10 +230,28 @@ class MDnsVmServiceDiscovery {
       final Set<String> uniqueDomainNamesInResults = <String>{};
 
       // Listen for mDNS connections until timeout.
-      final Stream<PtrResourceRecord> ptrResourceStream = client.lookup<PtrResourceRecord>(
-        ResourceRecordQuery.serverPointer(dartVmServiceName),
-        timeout: timeout
-      );
+      final Stream<PtrResourceRecord> ptrResourceStream;
+
+      try {
+        ptrResourceStream = client.lookup<PtrResourceRecord>(
+          ResourceRecordQuery.serverPointer(dartVmServiceName),
+          timeout: timeout,
+        );
+      } on SocketException catch (e, stacktrace) {
+        _logger.printError(e.message);
+        _logger.printTrace(stacktrace.toString());
+        if (globals.platform.isMacOS) {
+          throwToolExit(
+            'You might be having a permissions issue with your IDE. '
+            'Please try going to '
+            'System Settings -> Privacy & Security -> Local Network -> '
+            '[Find your IDE] -> Toggle ON, then restart your phone.'
+          );
+        } else {
+          rethrow;
+        }
+      }
+
       await for (final PtrResourceRecord ptr in ptrResourceStream) {
         uniqueDomainNames.add(ptr.domainName);
 
@@ -504,6 +527,7 @@ class MDnsVmServiceDiscovery {
     switch (targetPlatform) {
       case TargetPlatform.ios:
         UsageEvent('ios-mdns', 'no-ipv4-link-local', flutterUsage: _flutterUsage).send();
+        _analytics.send(Event.appleUsageEvent(workflow: 'ios-mdns', parameter: 'no-ipv4-link-local'));
         _logger.printError(
           'The mDNS query for an attached iOS device failed. It may '
           'be necessary to disable the "Personal Hotspot" on the device, and '
@@ -524,6 +548,7 @@ class MDnsVmServiceDiscovery {
       case TargetPlatform.tester:
       case TargetPlatform.web_javascript:
       case TargetPlatform.windows_x64:
+      case TargetPlatform.windows_arm64:
         _logger.printTrace('No interface with an ipv4 link local address was found.');
     }
   }

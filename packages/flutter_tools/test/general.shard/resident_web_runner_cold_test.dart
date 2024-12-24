@@ -23,12 +23,13 @@ import 'package:test/fake.dart';
 
 import '../src/common.dart';
 import '../src/context.dart';
+import '../src/fakes.dart';
 import '../src/test_build_system.dart';
 
 void main() {
   late FakeFlutterDevice mockFlutterDevice;
   late FakeWebDevFS mockWebDevFS;
-  late FileSystem fileSystem;
+  late MemoryFileSystem fileSystem;
 
   setUp(() {
     fileSystem = MemoryFileSystem.test();
@@ -37,7 +38,10 @@ void main() {
     mockFlutterDevice = FakeFlutterDevice(mockWebDevice);
     mockFlutterDevice._devFS = mockWebDevFS;
 
-    fileSystem.file('.packages').writeAsStringSync('\n');
+    fileSystem
+      .directory('.dart_tool')
+      .childFile('package_config.json')
+      .createSync(recursive: true);
     fileSystem.file('pubspec.yaml').createSync();
     fileSystem.file(fileSystem.path.join('lib', 'main.dart')).createSync(recursive: true);
     fileSystem.file(fileSystem.path.join('web', 'index.html')).createSync(recursive: true);
@@ -49,11 +53,14 @@ void main() {
       mockFlutterDevice,
       flutterProject: project,
       debuggingOptions: DebuggingOptions.disabled(BuildInfo.release),
-      ipv6: true,
       fileSystem: fileSystem,
       logger: BufferLogger.test(),
       systemClock: SystemClock.fixed(DateTime(0, 0, 0)),
       usage: TestUsage(),
+      analytics: getInitializedFakeAnalyticsInstance(
+        fs: fileSystem,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      ),
     );
 
     final Completer<DebugConnectionInfo> connectionInfoCompleter = Completer<DebugConnectionInfo>();
@@ -76,11 +83,14 @@ void main() {
       mockFlutterDevice,
       flutterProject: project,
       debuggingOptions: DebuggingOptions.disabled(BuildInfo.release),
-      ipv6: true,
       fileSystem: fileSystem,
       logger: BufferLogger.test(),
       systemClock: SystemClock.fixed(DateTime(0, 0, 0)),
       usage: TestUsage(),
+      analytics: getInitializedFakeAnalyticsInstance(
+        fs: fileSystem,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      ),
     );
 
     expect(() => residentWebRunner.run(), throwsToolExit());
@@ -98,11 +108,14 @@ void main() {
       mockFlutterDevice,
       flutterProject: project,
       debuggingOptions: DebuggingOptions.disabled(BuildInfo.release),
-      ipv6: true,
       fileSystem: fileSystem,
       logger: BufferLogger.test(),
       systemClock: SystemClock.fixed(DateTime(0, 0, 0)),
       usage: TestUsage(),
+      analytics: getInitializedFakeAnalyticsInstance(
+        fs: fileSystem,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      ),
     );
 
     expect(() async => residentWebRunner.run(), throwsException);
@@ -119,11 +132,14 @@ void main() {
       mockFlutterDevice,
       flutterProject: project,
       debuggingOptions: DebuggingOptions.disabled(BuildInfo.release),
-      ipv6: true,
       fileSystem: fileSystem,
       logger: BufferLogger.test(),
       systemClock: SystemClock.fixed(DateTime(0, 0, 0)),
       usage: TestUsage(),
+      analytics: getInitializedFakeAnalyticsInstance(
+        fs: fileSystem,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      ),
     );
     final Completer<DebugConnectionInfo> connectionInfoCompleter = Completer<DebugConnectionInfo>();
     unawaited(residentWebRunner.run(
@@ -145,11 +161,14 @@ void main() {
       mockFlutterDevice,
       flutterProject: project,
       debuggingOptions: DebuggingOptions.disabled(BuildInfo.release),
-      ipv6: true,
       fileSystem: fileSystem,
       logger: BufferLogger.test(),
       systemClock: SystemClock.fixed(DateTime(0, 0, 0)),
       usage: TestUsage(),
+      analytics: getInitializedFakeAnalyticsInstance(
+        fs: fileSystem,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      ),
     );
     final Completer<DebugConnectionInfo> connectionInfoCompleter = Completer<DebugConnectionInfo>();
     unawaited(residentWebRunner.run(
@@ -180,9 +199,6 @@ class FakeWebDevFS extends Fake implements WebDevFS {
   }
 }
 
-// Unfortunately Device, despite not being immutable, has an `operator ==`.
-// Until we fix that, we have to also ignore related lints here.
-// ignore: avoid_implementing_value_types
 class FakeWebDevice extends Fake implements Device {
   @override
   String get name => 'web';

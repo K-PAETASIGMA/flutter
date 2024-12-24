@@ -6,7 +6,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 
@@ -53,7 +52,7 @@ void main() {
     expect(themeData.mouseCursor, null);
   });
 
-  testWidgetsWithLeakTracking('Default BottomNavigationBarThemeData debugFillProperties', (WidgetTester tester) async {
+  testWidgets('Default BottomNavigationBarThemeData debugFillProperties', (WidgetTester tester) async {
     final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
     const BottomNavigationBarThemeData().debugFillProperties(builder);
 
@@ -65,7 +64,7 @@ void main() {
     expect(description, <String>[]);
   });
 
-  testWidgetsWithLeakTracking('BottomNavigationBarThemeData implements debugFillProperties', (WidgetTester tester) async {
+  testWidgets('BottomNavigationBarThemeData implements debugFillProperties', (WidgetTester tester) async {
     final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
     const BottomNavigationBarThemeData(
       backgroundColor: Color(0xfffffff0),
@@ -87,7 +86,7 @@ void main() {
         .map((DiagnosticsNode node) => node.toString())
         .toList();
 
-    expect(description[0], 'backgroundColor: Color(0xfffffff0)');
+    expect(description[0], 'backgroundColor: ${const Color(0xfffffff0)}');
     expect(description[1], 'elevation: 10.0');
 
     // Ignore instance address for IconThemeData.
@@ -96,17 +95,17 @@ void main() {
     expect(description[3].contains('unselectedIconTheme: IconThemeData'), isTrue);
     expect(description[3].contains('(size: 2.0)'), isTrue);
 
-    expect(description[4], 'selectedItemColor: Color(0xfffffff1)');
-    expect(description[5], 'unselectedItemColor: Color(0xfffffff2)');
+    expect(description[4], 'selectedItemColor: ${const Color(0xfffffff1)}');
+    expect(description[5], 'unselectedItemColor: ${const Color(0xfffffff2)}');
     expect(description[6], 'selectedLabelStyle: TextStyle(inherit: true, size: 3.0)');
     expect(description[7], 'unselectedLabelStyle: TextStyle(inherit: true, size: 4.0)');
     expect(description[8], 'showSelectedLabels: true');
     expect(description[9], 'showUnselectedLabels: true');
     expect(description[10], 'type: BottomNavigationBarType.fixed');
-    expect(description[11], 'mouseCursor: MaterialStateMouseCursor(clickable)');
+    expect(description[11], 'mouseCursor: WidgetStateMouseCursor(clickable)');
   });
 
-  testWidgetsWithLeakTracking('BottomNavigationBar is themeable', (WidgetTester tester) async {
+  testWidgets('BottomNavigationBar is themeable', (WidgetTester tester) async {
     const Color backgroundColor = Color(0xFF000001);
     const Color selectedItemColor = Color(0xFF000002);
     const Color unselectedItemColor = Color(0xFF000003);
@@ -210,7 +209,7 @@ void main() {
     expect(RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1), SystemMouseCursors.move);
   });
 
-  testWidgetsWithLeakTracking('BottomNavigationBar properties are taken over the theme values', (WidgetTester tester) async {
+  testWidgets('BottomNavigationBar properties are taken over the theme values', (WidgetTester tester) async {
     const Color themeBackgroundColor = Color(0xFF000001);
     const Color themeSelectedItemColor = Color(0xFF000002);
     const Color themeUnselectedItemColor = Color(0xFF000003);
@@ -337,7 +336,7 @@ void main() {
     expect(RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1), SystemMouseCursors.text);
   });
 
-  testWidgetsWithLeakTracking('BottomNavigationBarTheme can be used to hide all labels', (WidgetTester tester) async {
+  testWidgets('BottomNavigationBarTheme can be used to hide all labels', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/66738.
     await tester.pumpWidget(
       MaterialApp(
@@ -375,7 +374,7 @@ void main() {
     expect(tester.widget<Visibility>(findVisibility.at(1)).visible, false);
   });
 
-  testWidgetsWithLeakTracking('BottomNavigationBarTheme can be used to hide selected labels', (WidgetTester tester) async {
+  testWidgets('BottomNavigationBarTheme can be used to hide selected labels', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/66738.
     await tester.pumpWidget(
       MaterialApp(
@@ -413,7 +412,7 @@ void main() {
     expect(tester.widget<FadeTransition>(findFadeTransition.at(1)).opacity.value, 1.0);
   });
 
-  testWidgetsWithLeakTracking('BottomNavigationBarTheme can be used to hide unselected labels', (WidgetTester tester) async {
+  testWidgets('BottomNavigationBarTheme can be used to hide unselected labels', (WidgetTester tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData(

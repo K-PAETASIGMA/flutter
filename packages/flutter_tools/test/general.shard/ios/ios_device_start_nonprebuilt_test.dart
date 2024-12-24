@@ -10,6 +10,7 @@ import 'package:file_testing/file_testing.dart';
 import 'package:flutter_tools/src/artifacts.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
+import 'package:flutter_tools/src/base/os.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/base/version.dart';
 import 'package:flutter_tools/src/build_info.dart';
@@ -27,6 +28,7 @@ import 'package:flutter_tools/src/ios/xcodeproj.dart';
 import 'package:flutter_tools/src/macos/xcode.dart';
 import 'package:flutter_tools/src/project.dart';
 import 'package:test/fake.dart';
+import 'package:unified_analytics/unified_analytics.dart';
 
 import '../../src/common.dart';
 import '../../src/context.dart' hide FakeXcodeProjectInterpreter;
@@ -78,6 +80,10 @@ final FakePlatform macPlatform = FakePlatform(
   environment: <String, String>{},
 );
 
+final FakeOperatingSystemUtils os = FakeOperatingSystemUtils(
+  hostPlatform: HostPlatform.darwin_arm64,
+);
+
 void main() {
   late Artifacts artifacts;
   late String iosDeployPath;
@@ -88,12 +94,13 @@ void main() {
   });
 
   group('IOSDevice.startApp succeeds in release mode', () {
-    late FileSystem fileSystem;
+    late MemoryFileSystem fileSystem;
     late FakeProcessManager processManager;
     late BufferLogger logger;
     late Xcode xcode;
     late FakeXcodeProjectInterpreter fakeXcodeProjectInterpreter;
     late XcodeProjectInfo projectInfo;
+    late FakeAnalytics fakeAnalytics;
 
     setUp(() {
       logger = BufferLogger.test();
@@ -107,9 +114,10 @@ void main() {
       );
       fakeXcodeProjectInterpreter = FakeXcodeProjectInterpreter(projectInfo: projectInfo);
       xcode = Xcode.test(processManager: FakeProcessManager.any(), xcodeProjectInterpreter: fakeXcodeProjectInterpreter);
-      fileSystem.file('foo/.packages')
-        ..createSync(recursive: true)
-        ..writeAsStringSync('\n');
+      fakeAnalytics = getInitializedFakeAnalyticsInstance(
+        fs: fileSystem,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      );
     });
 
     testUsingContext('missing TARGET_BUILD_DIR', () async {
@@ -121,7 +129,7 @@ void main() {
       );
       setUpIOSProject(fileSystem);
       final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
 
       processManager.addCommand(FakeCommand(command: _xattrArgs(flutterProject)));
       processManager.addCommand(const FakeCommand(command: kRunReleaseArgs));
@@ -135,16 +143,26 @@ void main() {
       expect(launchResult.started, false);
       expect(logger.errorText, contains('Xcode build is missing expected TARGET_BUILD_DIR build setting'));
       expect(processManager, hasNoRemainingExpectations);
+      expect(
+        analyticsTimingEventExists(
+          sentEvents: fakeAnalytics.sentEvents,
+          workflow: 'build',
+          variableName: 'xcode-ios',
+        ),
+        true,
+      );
     }, overrides: <Type, Generator>{
       ProcessManager: () => processManager,
       FileSystem: () => fileSystem,
       Logger: () => logger,
+      OperatingSystemUtils: () => os,
       Platform: () => macPlatform,
       XcodeProjectInterpreter: () => FakeXcodeProjectInterpreter(buildSettings: const <String, String>{
         'WRAPPER_NAME': 'My Super Awesome App.app',
         'DEVELOPMENT_TEAM': '3333CCCC33',
       }, projectInfo: projectInfo),
       Xcode: () => xcode,
+      Analytics: () => fakeAnalytics,
     });
 
     testUsingContext('missing project info', () async {
@@ -156,7 +174,7 @@ void main() {
       );
       setUpIOSProject(fileSystem);
       final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
 
       final LaunchResult launchResult = await iosDevice.startApp(
         buildableIOSApp,
@@ -184,7 +202,7 @@ void main() {
       );
       setUpIOSProject(fileSystem);
       final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
       fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
       processManager.addCommand(FakeCommand(command: _xattrArgs(flutterProject)));
@@ -228,6 +246,92 @@ void main() {
       ProcessManager: () => processManager,
       FileSystem: () => fileSystem,
       Logger: () => logger,
+      OperatingSystemUtils: () => os,
+      Platform: () => macPlatform,
+      XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
+      Xcode: () => xcode,
+    });
+
+    testUsingContext('ONLY_ACTIVE_ARCH is NO if different host and target architectures', () async {
+      // Host architecture is x64, target architecture is arm64.
+      final IOSDevice iosDevice = setUpIOSDevice(
+        fileSystem: fileSystem,
+        processManager: processManager,
+        logger: logger,
+        artifacts: artifacts,
+      );
+      setUpIOSProject(fileSystem);
+      final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
+      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
+      fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
+
+      processManager.addCommand(FakeCommand(command: _xattrArgs(flutterProject)));
+      processManager.addCommand(const FakeCommand(command: <String>[
+        'xcrun',
+        'xcodebuild',
+        '-configuration',
+        'Release',
+        '-quiet',
+        '-workspace',
+        'Runner.xcworkspace',
+        '-scheme',
+        'Runner',
+        'BUILD_DIR=/build/ios',
+        '-sdk',
+        'iphoneos',
+        '-destination',
+        'id=123',
+        'ONLY_ACTIVE_ARCH=NO',
+        'ARCHS=arm64',
+        '-resultBundlePath',
+        '/.tmp_rand0/flutter_ios_build_temp_dirrand0/temporary_xcresult_bundle',
+        '-resultBundleVersion',
+        '3',
+        'FLUTTER_SUPPRESS_ANALYTICS=true',
+        'COMPILER_INDEX_STORE_ENABLE=NO',
+      ]));
+      processManager.addCommand(const FakeCommand(command: <String>[
+        'rsync',
+        '-8',
+        '-av',
+        '--delete',
+        'build/ios/Release-iphoneos/My Super Awesome App.app',
+        'build/ios/iphoneos',
+      ]));
+      processManager.addCommand(FakeCommand(
+        command: <String>[
+          iosDeployPath,
+          '--id',
+          '123',
+          '--bundle',
+          'build/ios/iphoneos/My Super Awesome App.app',
+          '--app_deltas',
+          'build/ios/app-delta',
+          '--no-wifi',
+          '--justlaunch',
+          '--args',
+          const <String>[
+            '--enable-dart-profiling',
+          ].join(' '),
+        ])
+      );
+
+      final LaunchResult launchResult = await iosDevice.startApp(
+        buildableIOSApp,
+        debuggingOptions: DebuggingOptions.disabled(BuildInfo.release),
+        platformArgs: <String, Object>{},
+      );
+
+      expect(fileSystem.directory('build/ios/iphoneos'), exists);
+      expect(launchResult.started, true);
+      expect(processManager, hasNoRemainingExpectations);
+    }, overrides: <Type, Generator>{
+      ProcessManager: () => processManager,
+      FileSystem: () => fileSystem,
+      Logger: () => logger,
+      OperatingSystemUtils: () => FakeOperatingSystemUtils(
+        hostPlatform: HostPlatform.darwin_x64,
+      ),
       Platform: () => macPlatform,
       XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
       Xcode: () => xcode,
@@ -242,7 +346,7 @@ void main() {
       );
       setUpIOSProject(fileSystem);
       final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+      final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
 
       processManager.addCommand(FakeCommand(command: _xattrArgs(flutterProject)));
       // The first xcrun call should fail with a
@@ -314,13 +418,10 @@ void main() {
       );
       fakeXcodeProjectInterpreter = FakeXcodeProjectInterpreter(projectInfo: projectInfo);
       xcode = Xcode.test(processManager: FakeProcessManager.any(), xcodeProjectInterpreter: fakeXcodeProjectInterpreter);
-      fileSystem.file('foo/.packages')
-        ..createSync(recursive: true)
-        ..writeAsStringSync('\n');
     });
 
     group('in release mode', () {
-      testUsingContext('suceeds when install and launch succeed', () async {
+      testUsingContext('succeeds when install and launch succeed', () async {
         final IOSDevice iosDevice = setUpIOSDevice(
           fileSystem: fileSystem,
           processManager: FakeProcessManager.any(),
@@ -331,7 +432,7 @@ void main() {
         );
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final LaunchResult launchResult = await iosDevice.startApp(
@@ -347,6 +448,7 @@ void main() {
         ProcessManager: () => FakeProcessManager.any(),
         FileSystem: () => fileSystem,
         Logger: () => logger,
+        OperatingSystemUtils: () => os,
         Platform: () => macPlatform,
         XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
         Xcode: () => xcode,
@@ -365,7 +467,7 @@ void main() {
         );
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final LaunchResult launchResult = await iosDevice.startApp(
@@ -381,6 +483,7 @@ void main() {
         ProcessManager: () => FakeProcessManager.any(),
         FileSystem: () => fileSystem,
         Logger: () => logger,
+        OperatingSystemUtils: () => os,
         Platform: () => macPlatform,
         XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
         Xcode: () => xcode,
@@ -399,7 +502,7 @@ void main() {
         );
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final LaunchResult launchResult = await iosDevice.startApp(
@@ -415,6 +518,7 @@ void main() {
         ProcessManager: () => FakeProcessManager.any(),
         FileSystem: () => fileSystem,
         Logger: () => logger,
+        OperatingSystemUtils: () => os,
         Platform: () => macPlatform,
         XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
         Xcode: () => xcode,
@@ -432,7 +536,7 @@ void main() {
         );
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final LaunchResult launchResult = await iosDevice.startApp(
@@ -450,6 +554,7 @@ void main() {
         ProcessManager: () => FakeProcessManager.any(),
         FileSystem: () => fileSystem,
         Logger: () => logger,
+        OperatingSystemUtils: () => os,
         Platform: () => macPlatform,
         XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
         Xcode: () => xcode,
@@ -481,7 +586,7 @@ void main() {
 
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final FakeDeviceLogReader deviceLogReader = FakeDeviceLogReader();
@@ -503,6 +608,7 @@ void main() {
             buildName: '1.2.3',
             buildNumber: '4',
             treeShakeIcons: false,
+            packageConfigPath: '.dart_tool/package_config.json',
           )),
           platformArgs: <String, Object>{},
         );
@@ -515,9 +621,87 @@ void main() {
         ProcessManager: () => FakeProcessManager.any(),
         FileSystem: () => fileSystem,
         Logger: () => logger,
+        OperatingSystemUtils: () => os,
         Platform: () => macPlatform,
         XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
         Xcode: () => xcode,
+      });
+
+      group('with flavor', () {
+        setUp(() {
+          projectInfo = XcodeProjectInfo(
+            <String>['Runner'],
+            <String>['Debug', 'Release', 'Debug-free', 'Release-free'],
+            <String>['Runner', 'free'],
+            logger,
+          );
+          fakeXcodeProjectInterpreter = FakeXcodeProjectInterpreter(projectInfo: projectInfo);
+          xcode = Xcode.test(processManager: FakeProcessManager.any(), xcodeProjectInterpreter: fakeXcodeProjectInterpreter);
+        });
+
+        testUsingContext('succeeds', () async {
+          final IOSDevice iosDevice = setUpIOSDevice(
+            fileSystem: fileSystem,
+            processManager: FakeProcessManager.any(),
+            logger: logger,
+            artifacts: artifacts,
+            isCoreDevice: true,
+            coreDeviceControl: FakeIOSCoreDeviceControl(),
+            xcodeDebug: FakeXcodeDebug(
+              expectedProject: XcodeDebugProject(
+                scheme: 'free',
+                xcodeWorkspace: fileSystem.directory('/ios/Runner.xcworkspace'),
+                xcodeProject: fileSystem.directory('/ios/Runner.xcodeproj'),
+                hostAppProjectName: 'Runner',
+              ),
+              expectedDeviceId: '123',
+              expectedLaunchArguments: <String>['--enable-dart-profiling'],
+              expectedSchemeFilePath: '/ios/Runner.xcodeproj/xcshareddata/xcschemes/free.xcscheme',
+            ),
+          );
+
+          setUpIOSProject(fileSystem);
+          final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
+          final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
+          fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
+
+          final FakeDeviceLogReader deviceLogReader = FakeDeviceLogReader();
+
+          iosDevice.portForwarder = const NoOpDevicePortForwarder();
+          iosDevice.setLogReader(buildableIOSApp, deviceLogReader);
+
+          // Start writing messages to the log reader.
+          Timer.run(() {
+            deviceLogReader.addLine('Foo');
+            deviceLogReader.addLine('The Dart VM service is listening on http://127.0.0.1:456');
+          });
+
+          final LaunchResult launchResult = await iosDevice.startApp(
+            buildableIOSApp,
+            debuggingOptions: DebuggingOptions.enabled(const BuildInfo(
+              BuildMode.debug,
+              'free',
+              buildName: '1.2.3',
+              buildNumber: '4',
+              treeShakeIcons: false,
+              packageConfigPath: '.dart_tool/package_config.json',
+            )),
+            platformArgs: <String, Object>{},
+          );
+
+          expect(logger.errorText, isEmpty);
+          expect(fileSystem.directory('build/ios/iphoneos'), exists);
+          expect(launchResult.started, true);
+          expect(processManager, hasNoRemainingExpectations);
+        }, overrides: <Type, Generator>{
+          ProcessManager: () => FakeProcessManager.any(),
+          FileSystem: () => fileSystem,
+          Logger: () => logger,
+          OperatingSystemUtils: () => os,
+          Platform: () => macPlatform,
+          XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
+          Xcode: () => xcode,
+        });
       });
 
       testUsingContext('updates Generated.xcconfig before and after launch', () async {
@@ -547,7 +731,7 @@ void main() {
 
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final FakeDeviceLogReader deviceLogReader = FakeDeviceLogReader();
@@ -569,6 +753,7 @@ void main() {
             buildName: '1.2.3',
             buildNumber: '4',
             treeShakeIcons: false,
+            packageConfigPath: '.dart_tool/package_config.json',
           )),
           platformArgs: <String, Object>{},
         );
@@ -593,6 +778,7 @@ void main() {
         ProcessManager: () => FakeProcessManager.any(),
         FileSystem: () => fileSystem,
         Logger: () => logger,
+        OperatingSystemUtils: () => os,
         Platform: () => macPlatform,
         XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
         Xcode: () => xcode,
@@ -609,7 +795,7 @@ void main() {
         );
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final LaunchResult launchResult = await iosDevice.startApp(
@@ -620,6 +806,7 @@ void main() {
             buildName: '1.2.3',
             buildNumber: '4',
             treeShakeIcons: false,
+            packageConfigPath: '.dart_tool/package_config.json',
           )),
           platformArgs: <String, Object>{},
         );
@@ -647,7 +834,7 @@ void main() {
         );
         setUpIOSProject(fileSystem, createWorkspace: false);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final LaunchResult launchResult = await iosDevice.startApp(
@@ -658,6 +845,7 @@ void main() {
             buildName: '1.2.3',
             buildNumber: '4',
             treeShakeIcons: false,
+            packageConfigPath: '.dart_tool/package_config.json',
           )),
           platformArgs: <String, Object>{},
         );
@@ -669,6 +857,7 @@ void main() {
         ProcessManager: () => FakeProcessManager.any(),
         FileSystem: () => fileSystem,
         Logger: () => logger,
+        OperatingSystemUtils: () => os,
         Platform: () => macPlatform,
         XcodeProjectInterpreter: () => fakeXcodeProjectInterpreter,
         Xcode: () => xcode,
@@ -685,7 +874,7 @@ void main() {
         );
         setUpIOSProject(fileSystem);
         final FlutterProject flutterProject = FlutterProject.fromDirectory(fileSystem.currentDirectory);
-        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App.app');
+        final BuildableIOSApp buildableIOSApp = BuildableIOSApp(flutterProject.ios, 'flutter', 'My Super Awesome App');
         fileSystem.directory('build/ios/Release-iphoneos/My Super Awesome App.app').createSync(recursive: true);
 
         final FakeDeviceLogReader deviceLogReader = FakeDeviceLogReader();
@@ -707,6 +896,7 @@ void main() {
             buildName: '1.2.3',
             buildNumber: '4',
             treeShakeIcons: false,
+            packageConfigPath: '.dart_tool/package_config.json',
           )),
           platformArgs: <String, Object>{},
         ), throwsToolExit());
@@ -724,7 +914,10 @@ void main() {
 
 void setUpIOSProject(FileSystem fileSystem, {bool createWorkspace = true}) {
   fileSystem.file('pubspec.yaml').createSync();
-  fileSystem.file('.packages').writeAsStringSync('\n');
+  fileSystem
+    .directory('.dart_tool')
+    .childFile('package_config.json')
+    .createSync(recursive: true);
   fileSystem.directory('ios').createSync();
   if (createWorkspace) {
     fileSystem.directory('ios/Runner.xcworkspace').createSync();
@@ -743,6 +936,7 @@ IOSDevice setUpIOSDevice({
   bool isCoreDevice = false,
   IOSCoreDeviceControl? coreDeviceControl,
   FakeXcodeDebug? xcodeDebug,
+  DarwinArch cpuArchitecture = DarwinArch.arm64,
 }) {
   artifacts ??= Artifacts.test();
   final Cache cache = Cache.test(
@@ -776,9 +970,10 @@ IOSDevice setUpIOSDevice({
     ),
     coreDeviceControl: coreDeviceControl ?? FakeIOSCoreDeviceControl(),
     xcodeDebug: xcodeDebug ?? FakeXcodeDebug(),
-    cpuArchitecture: DarwinArch.arm64,
+    cpuArchitecture: cpuArchitecture,
     connectionInterface: DeviceConnectionInterface.attached,
     isConnected: true,
+    isPaired: true,
     devModeEnabled: true,
     isCoreDevice: isCoreDevice,
   );
@@ -829,6 +1024,7 @@ class FakeXcodeDebug extends Fake implements XcodeDebug {
     this.expectedProject,
     this.expectedDeviceId,
     this.expectedLaunchArguments,
+    this.expectedSchemeFilePath = '/ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme',
     this.debugStartedCompleter,
     this.debugEndedCompleter,
   });
@@ -840,6 +1036,7 @@ class FakeXcodeDebug extends Fake implements XcodeDebug {
   final List<String>? expectedLaunchArguments;
   final Completer<void>? debugStartedCompleter;
   final Completer<void>? debugEndedCompleter;
+  final String expectedSchemeFilePath;
 
   @override
   Future<bool> debugApp({
@@ -862,6 +1059,11 @@ class FakeXcodeDebug extends Fake implements XcodeDebug {
     }
     await debugEndedCompleter?.future;
     return debugSuccess;
+  }
+
+  @override
+  void ensureXcodeDebuggerLaunchAction(File schemeFile) {
+    expect(schemeFile.path, expectedSchemeFilePath);
   }
 }
 

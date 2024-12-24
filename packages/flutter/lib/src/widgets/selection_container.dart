@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/material.dart';
+///
+/// @docImport 'selectable_region.dart';
+library;
+
 import 'package:flutter/rendering.dart';
 
 import 'framework.dart';
@@ -199,6 +204,9 @@ class _SelectionContainerState extends State<SelectionContainer> with Selectable
 
   @override
   Size get size => (context.findRenderObject()! as RenderBox).size;
+
+  @override
+  List<Rect> get boundingBoxes => <Rect>[(context.findRenderObject()! as RenderBox).paintBounds];
 
   @override
   void dispose() {

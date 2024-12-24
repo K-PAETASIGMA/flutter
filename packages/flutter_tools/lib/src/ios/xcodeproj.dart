@@ -5,6 +5,7 @@
 import 'package:file/memory.dart';
 import 'package:meta/meta.dart';
 import 'package:process/process.dart';
+import 'package:unified_analytics/unified_analytics.dart';
 
 import '../base/common.dart';
 import '../base/file_system.dart';
@@ -30,6 +31,7 @@ class XcodeProjectInterpreter {
     required Logger logger,
     required FileSystem fileSystem,
     required Usage usage,
+    required Analytics analytics,
   }) {
     return XcodeProjectInterpreter._(
       platform: platform,
@@ -37,6 +39,7 @@ class XcodeProjectInterpreter {
       logger: logger,
       fileSystem: fileSystem,
       usage: usage,
+      analytics: analytics,
     );
   }
 
@@ -46,6 +49,7 @@ class XcodeProjectInterpreter {
     required Logger logger,
     required FileSystem fileSystem,
     required Usage usage,
+    required Analytics analytics,
     Version? version,
     String? build,
   }) : _platform = platform,
@@ -61,7 +65,8 @@ class XcodeProjectInterpreter {
         _version = version,
         _build = build,
         _versionText = version?.toString(),
-        _usage = usage;
+        _usage = usage,
+        _analytics = analytics;
 
   /// Create an [XcodeProjectInterpreter] for testing.
   ///
@@ -73,6 +78,7 @@ class XcodeProjectInterpreter {
     required ProcessManager processManager,
     Version? version = const Version.withText(1000, 0, 0, '1000.0.0'),
     String? build = '13C100',
+    Analytics? analytics,
   }) {
     final Platform platform = FakePlatform(
       operatingSystem: 'macos',
@@ -86,6 +92,7 @@ class XcodeProjectInterpreter {
       logger: BufferLogger.test(),
       version: version,
       build: build,
+      analytics: analytics ?? const NoOpAnalytics(),
     );
   }
 
@@ -95,6 +102,7 @@ class XcodeProjectInterpreter {
   final OperatingSystemUtils _operatingSystemUtils;
   final Logger _logger;
   final Usage _usage;
+  final Analytics _analytics;
   static final RegExp _versionRegex = RegExp(r'Xcode ([0-9.]+).*Build version (\w+)');
 
   void _updateVersion() {
@@ -187,6 +195,11 @@ class XcodeProjectInterpreter {
     final String? configuration = buildContext.configuration;
     final String? target = buildContext.target;
     final String? deviceId = buildContext.deviceId;
+    final String buildDir = switch (buildContext.sdk) {
+      XcodeSdk.MacOSX => getMacOSBuildDirectory(),
+      XcodeSdk.IPhoneOS || XcodeSdk.IPhoneSimulator => getIosBuildDirectory(),
+      XcodeSdk.WatchOS || XcodeSdk.WatchSimulator => getIosBuildDirectory(),
+    };
     final List<String> showBuildSettingsCommand = <String>[
       ...xcrunCommand(),
       'xcodebuild',
@@ -198,21 +211,20 @@ class XcodeProjectInterpreter {
         ...<String>['-configuration', configuration],
       if (target != null)
         ...<String>['-target', target],
-      if (buildContext.environmentType == EnvironmentType.simulator)
+      if (buildContext.sdk == XcodeSdk.IPhoneSimulator)
         ...<String>['-sdk', 'iphonesimulator'],
       '-destination',
-      if (buildContext.isWatch && buildContext.environmentType == EnvironmentType.physical)
-        'generic/platform=watchOS'
-      else if (buildContext.isWatch)
-        'generic/platform=watchOS Simulator'
-      else if (deviceId != null)
+      if (deviceId != null)
         'id=$deviceId'
-      else if (buildContext.environmentType == EnvironmentType.physical)
-        'generic/platform=iOS'
-      else
-        'generic/platform=iOS Simulator',
+      else switch (buildContext.sdk) {
+        XcodeSdk.IPhoneOS => 'generic/platform=iOS',
+        XcodeSdk.IPhoneSimulator => 'generic/platform=iOS Simulator',
+        XcodeSdk.MacOSX => 'generic/platform=macOS',
+        XcodeSdk.WatchOS => 'generic/platform=watchOS',
+        XcodeSdk.WatchSimulator => 'generic/platform=watchOS Simulator',
+      },
       '-showBuildSettings',
-      'BUILD_DIR=${_fileSystem.path.absolute(getIosBuildDirectory())}',
+      'BUILD_DIR=${_fileSystem.path.absolute(buildDir)}',
       ...environmentVariablesAsXcodeBuildSettings(_platform),
     ];
     try {
@@ -230,11 +242,21 @@ class XcodeProjectInterpreter {
       return parseXcodeBuildSettings(out);
     } on Exception catch (error) {
       if (error is ProcessException && error.toString().contains('timed out')) {
+        final String eventType = switch (buildContext.sdk) {
+          XcodeSdk.MacOSX => 'macos',
+          XcodeSdk.IPhoneOS || XcodeSdk.IPhoneSimulator => 'ios',
+          XcodeSdk.WatchOS || XcodeSdk.WatchSimulator => 'watchos',
+        };
         BuildEvent('xcode-show-build-settings-timeout',
-          type: 'ios',
+          type: eventType,
           command: showBuildSettingsCommand.join(' '),
           flutterUsage: _usage,
         ).send();
+        _analytics.send(Event.flutterBuildInfo(
+          label: 'xcode-show-build-settings-timeout',
+          buildType: eventType,
+          command: showBuildSettingsCommand.join(' '),
+        ));
       }
       _logger.printTrace('Unexpected failure to get Xcode build settings: $error.');
       return const <String, String>{};
@@ -290,6 +312,11 @@ class XcodeProjectInterpreter {
           command: showBuildSettingsCommand.join(' '),
           flutterUsage: _usage,
         ).send();
+        _analytics.send(Event.flutterBuildInfo(
+          label: 'xcode-show-build-settings-timeout',
+          buildType: 'ios',
+          command: showBuildSettingsCommand.join(' '),
+        ));
       }
       _logger.printTrace('Unexpected failure to get Pod Xcode project build settings: $error.');
       return null;
@@ -376,26 +403,40 @@ String substituteXcodeVariables(String str, Map<String, String> xcodeBuildSettin
   return str.replaceAllMapped(_varExpr, (Match m) => xcodeBuildSettings[m[1]!] ?? m[0]!);
 }
 
+/// Xcode SDKs. Corresponds to undocumented Xcode SUPPORTED_PLATFORMS values.
+/// Use `xcodebuild -showsdks` to get a list of SDKs installed on your machine.
+enum XcodeSdk {
+  IPhoneOS,
+  IPhoneSimulator,
+  MacOSX,
+  WatchOS,
+  WatchSimulator,
+}
+
 @immutable
 class XcodeProjectBuildContext {
   const XcodeProjectBuildContext({
     this.scheme,
     this.configuration,
-    this.environmentType = EnvironmentType.physical,
+    this.sdk = XcodeSdk.IPhoneOS,
     this.deviceId,
     this.target,
-    this.isWatch = false,
   });
 
   final String? scheme;
   final String? configuration;
-  final EnvironmentType environmentType;
+  final XcodeSdk sdk;
   final String? deviceId;
   final String? target;
-  final bool isWatch;
 
   @override
-  int get hashCode => Object.hash(scheme, configuration, environmentType, deviceId, target);
+  int get hashCode => Object.hash(
+    scheme,
+    configuration,
+    sdk,
+    deviceId,
+    target,
+  );
 
   @override
   bool operator ==(Object other) {
@@ -403,12 +444,11 @@ class XcodeProjectBuildContext {
       return true;
     }
     return other is XcodeProjectBuildContext &&
-        other.scheme == scheme &&
-        other.configuration == configuration &&
-        other.deviceId == deviceId &&
-        other.environmentType == environmentType &&
-        other.isWatch == isWatch &&
-        other.target == target;
+      other.scheme == scheme &&
+      other.configuration == configuration &&
+      other.deviceId == deviceId &&
+      other.sdk == sdk &&
+      other.target == target;
   }
 }
 

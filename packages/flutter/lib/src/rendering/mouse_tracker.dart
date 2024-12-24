@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This library intentionally uses the LinkedHashMap constructor to declare that
-// entries will be ordered. Using collection literals for this requires casting the
-// resulting map, which has a runtime cost.
-// ignore_for_file: prefer_collection_literals
+/// @docImport 'binding.dart';
+library;
 
 import 'dart:collection' show LinkedHashMap;
 import 'dart:ui';
@@ -305,19 +303,16 @@ class MouseTracker extends ChangeNotifier {
   /// The [updateWithEvent] is one of the two ways of updating mouse
   /// states, the other one being [updateAllDevices].
   void updateWithEvent(PointerEvent event, HitTestResult? hitTestResult) {
-    if (event.kind != PointerDeviceKind.mouse) {
+    if (event.kind != PointerDeviceKind.mouse && event.kind != PointerDeviceKind.stylus) {
       return;
     }
     if (event is PointerSignalEvent) {
       return;
     }
-    final HitTestResult result;
-    if (event is PointerRemovedEvent) {
-      result = HitTestResult();
-    } else {
-      final int viewId = event.viewId;
-      result = hitTestResult ?? _hitTestInView(event.position, viewId);
-    }
+    final HitTestResult result = switch (event) {
+      PointerRemovedEvent() => HitTestResult(),
+      _ => hitTestResult ?? _hitTestInView(event.position, event.viewId),
+    };
     final int device = event.device;
     final _MouseState? existingState = _mouseStates[device];
     if (!_shouldMarkStateDirty(existingState, event)) {
@@ -412,10 +407,8 @@ class MouseTracker extends ChangeNotifier {
     // hit-test order.
     final PointerExitEvent baseExitEvent = PointerExitEvent.fromMouseEvent(latestEvent);
     lastAnnotations.forEach((MouseTrackerAnnotation annotation, Matrix4 transform) {
-      if (!nextAnnotations.containsKey(annotation)) {
-        if (annotation.validForMouseTracker && annotation.onExit != null) {
-          annotation.onExit!(baseExitEvent.transformed(lastAnnotations[annotation]));
-        }
+      if (annotation.validForMouseTracker && !nextAnnotations.containsKey(annotation)) {
+        annotation.onExit?.call(baseExitEvent.transformed(lastAnnotations[annotation]));
       }
     });
 
@@ -426,8 +419,8 @@ class MouseTracker extends ChangeNotifier {
     ).toList();
     final PointerEnterEvent baseEnterEvent = PointerEnterEvent.fromMouseEvent(latestEvent);
     for (final MouseTrackerAnnotation annotation in enteringAnnotations.reversed) {
-      if (annotation.validForMouseTracker && annotation.onEnter != null) {
-        annotation.onEnter!(baseEnterEvent.transformed(nextAnnotations[annotation]));
+      if (annotation.validForMouseTracker) {
+        annotation.onEnter?.call(baseEnterEvent.transformed(nextAnnotations[annotation]));
       }
     }
   }

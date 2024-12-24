@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/material.dart';
+///
+/// @docImport 'editable_text.dart';
+/// @docImport 'focus_scope.dart';
+library;
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -32,6 +38,7 @@ class UndoHistory<T> extends StatefulWidget {
     required this.value,
     required this.onTriggered,
     required this.focusNode,
+    this.undoStackModifier,
     this.controller,
     required this.child,
   });
@@ -42,6 +49,14 @@ class UndoHistory<T> extends StatefulWidget {
   /// Called when checking whether a value change should be pushed onto
   /// the undo stack.
   final bool Function(T? oldValue, T newValue)? shouldChangeUndoStack;
+
+  /// Called right before a new entry is pushed to the undo stack.
+  ///
+  /// The value returned from this method will be pushed to the stack instead
+  /// of the original value.
+  ///
+  /// If null then the original value will always be pushed to the stack.
+  final T Function(T value)? undoStackModifier;
 
   /// Called when an undo or redo causes a state change.
   ///
@@ -178,13 +193,22 @@ class UndoHistoryState<T> extends State<UndoHistory<T>> with UndoManagerClient {
       return;
     }
 
-    _lastValue = widget.value.value;
+    final T nextValue = widget.undoStackModifier?.call(widget.value.value) ?? widget.value.value;
+    if (nextValue == _lastValue) {
+      return;
+    }
 
-    _throttleTimer = _throttledPush(widget.value.value);
+    _lastValue = nextValue;
+
+    _throttleTimer = _throttledPush(nextValue);
   }
 
   void _handleFocus() {
     if (!widget.focusNode.hasFocus) {
+      if (UndoManager.client == this) {
+        UndoManager.client = null;
+      }
+
       return;
     }
     UndoManager.client = this;
@@ -243,6 +267,10 @@ class UndoHistoryState<T> extends State<UndoHistory<T>> with UndoManagerClient {
 
   @override
   void dispose() {
+    if (UndoManager.client == this) {
+      UndoManager.client = null;
+    }
+
     widget.value.removeListener(_push);
     widget.focusNode.removeListener(_handleFocus);
     _effectiveController.onUndo.removeListener(undo);

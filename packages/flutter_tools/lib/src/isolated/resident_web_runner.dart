@@ -4,9 +4,9 @@
 
 import 'dart:async';
 
-// ignore: import_of_legacy_library_into_null_safe
 import 'package:dwds/dwds.dart';
 import 'package:package_config/package_config.dart';
+import 'package:unified_analytics/unified_analytics.dart';
 import 'package:vm_service/vm_service.dart' as vmservice;
 import 'package:webkit_inspection_protocol/webkit_inspection_protocol.dart'
     hide StackTrace;
@@ -50,13 +50,13 @@ class DwdsWebRunnerFactory extends WebRunnerFactory {
     String? target,
     required bool stayResident,
     required FlutterProject flutterProject,
-    required bool? ipv6,
     required DebuggingOptions debuggingOptions,
     UrlTunneller? urlTunneller,
     required Logger logger,
     required FileSystem fileSystem,
     required SystemClock systemClock,
     required Usage usage,
+    required Analytics analytics,
     bool machine = false,
   }) {
     return ResidentWebRunner(
@@ -64,11 +64,11 @@ class DwdsWebRunnerFactory extends WebRunnerFactory {
       target: target,
       flutterProject: flutterProject,
       debuggingOptions: debuggingOptions,
-      ipv6: ipv6,
       stayResident: stayResident,
       urlTunneller: urlTunneller,
       machine: machine,
       usage: usage,
+      analytics: analytics,
       systemClock: systemClock,
       fileSystem: fileSystem,
       logger: logger,
@@ -87,24 +87,25 @@ class ResidentWebRunner extends ResidentRunner {
     bool stayResident = true,
     bool machine = false,
     required this.flutterProject,
-    required bool? ipv6,
     required DebuggingOptions debuggingOptions,
     required FileSystem fileSystem,
     required Logger logger,
     required SystemClock systemClock,
     required Usage usage,
+    required Analytics analytics,
     UrlTunneller? urlTunneller,
+    // TODO(bkonyi): remove when ready to serve DevTools from DDS.
     ResidentDevtoolsHandlerFactory devtoolsHandler = createDefaultHandler,
   }) : _fileSystem = fileSystem,
        _logger = logger,
        _systemClock = systemClock,
        _usage = usage,
+       _analytics = analytics,
        _urlTunneller = urlTunneller,
        super(
           <FlutterDevice>[device],
           target: target ?? fileSystem.path.join('lib', 'main.dart'),
           debuggingOptions: debuggingOptions,
-          ipv6: ipv6,
           stayResident: stayResident,
           machine: machine,
           devtoolsHandler: devtoolsHandler,
@@ -114,6 +115,7 @@ class ResidentWebRunner extends ResidentRunner {
   final Logger _logger;
   final SystemClock _systemClock;
   final Usage _usage;
+  final Analytics _analytics;
   final UrlTunneller? _urlTunneller;
 
   @override
@@ -124,15 +126,17 @@ class ResidentWebRunner extends ResidentRunner {
 
   FlutterDevice? get device => flutterDevices.first;
   final FlutterProject flutterProject;
-  DateTime? firstBuildTime;
+
+  // Mapping from service name to service method.
+  final Map<String, String> _registeredMethodsForService = <String, String>{};
 
   // Used with the new compiler to generate a bootstrap file containing plugins
   // and platform initialization.
   Directory? _generatedEntrypointDirectory;
 
-  // Only the debug builds of the web support the service protocol.
+  // Only non-wasm debug builds of the web support the service protocol.
   @override
-  bool get supportsServiceProtocol => isRunningDebug && deviceIsDebuggable;
+  bool get supportsServiceProtocol => !debuggingOptions.webUseWasm && isRunningDebug && deviceIsDebuggable;
 
   @override
   bool get debuggingEnabled => isRunningDebug && deviceIsDebuggable;
@@ -152,6 +156,7 @@ class ResidentWebRunner extends ResidentRunner {
   ConnectionResult? _connectionResult;
   StreamSubscription<vmservice.Event>? _stdOutSub;
   StreamSubscription<vmservice.Event>? _stdErrSub;
+  StreamSubscription<vmservice.Event>? _serviceSub;
   StreamSubscription<vmservice.Event>? _extensionEventSub;
   bool _exited = false;
   WipConnection? _wipConnection;
@@ -161,11 +166,16 @@ class ResidentWebRunner extends ResidentRunner {
     if (_instance != null) {
       return _instance!;
     }
-    final vmservice.VmService? service =_connectionResult?.vmService;
+    final vmservice.VmService? service = _connectionResult?.vmService;
     final Uri websocketUri = Uri.parse(_connectionResult!.debugConnection!.uri);
     final Uri httpUri = _httpUriFromWebsocketUri(websocketUri);
-    return _instance ??= FlutterVmService(service!, wsAddress: websocketUri, httpAddress: httpUri);
+    return _instance ??= FlutterVmService(
+      service!,
+      wsAddress: websocketUri,
+      httpAddress: httpUri,
+    );
   }
+
   FlutterVmService? _instance;
 
   @override
@@ -182,11 +192,14 @@ class ResidentWebRunner extends ResidentRunner {
     if (_exited) {
       return;
     }
+    // TODO(bkonyi): remove when ready to serve DevTools from DDS.
     await residentDevtoolsHandler!.shutdown();
     await _stdOutSub?.cancel();
     await _stdErrSub?.cancel();
+    await _serviceSub?.cancel();
     await _extensionEventSub?.cancel();
     await device!.device!.stopApp(null);
+    _registeredMethodsForService.clear();
     try {
       _generatedEntrypointDirectory?.deleteSync(recursive: true);
     } on FileSystemException {
@@ -232,10 +245,8 @@ class ResidentWebRunner extends ResidentRunner {
   Future<int> run({
     Completer<DebugConnectionInfo>? connectionInfoCompleter,
     Completer<void>? appStartedCompleter,
-    bool enableDevTools = false, // ignored, we don't yet support devtools for web
     String? route,
   }) async {
-    firstBuildTime = DateTime.now();
     final ApplicationPackage? package = await ApplicationPackageFactory.instance!.getPackageForPlatform(
       TargetPlatform.web_javascript,
       buildInfo: debuggingOptions.buildInfo,
@@ -284,9 +295,12 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
           debuggingOptions.webEnableExpressionEvaluation
               ? WebExpressionCompiler(device!.generator!, fileSystem: _fileSystem)
               : null;
+
         device!.devFS = WebDevFS(
           hostname: debuggingOptions.hostname ?? 'localhost',
           port: await getPort(),
+          tlsCertPath: debuggingOptions.tlsCertPath,
+          tlsCertKeyPath: debuggingOptions.tlsCertKeyPath,
           packagesFilePath: packagesFilePath,
           urlTunneller: _urlTunneller,
           useSseForDebugProxy: debuggingOptions.webUseSseForDebugProxy,
@@ -297,13 +311,22 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
           enableDds: debuggingOptions.enableDds,
           entrypoint: _fileSystem.file(target).uri,
           expressionCompiler: expressionCompiler,
+          extraHeaders: debuggingOptions.webHeaders,
           chromiumLauncher: _chromiumLauncher,
           nullAssertions: debuggingOptions.nullAssertions,
           nullSafetyMode: debuggingOptions.buildInfo.nullSafetyMode,
           nativeNullAssertions: debuggingOptions.nativeNullAssertions,
+          ddcModuleSystem: debuggingOptions.buildInfo.ddcModuleFormat == DdcModuleFormat.ddc,
+          webRenderer: debuggingOptions.webRenderer,
+          isWasm: debuggingOptions.webUseWasm,
+          useLocalCanvasKit: debuggingOptions.buildInfo.useLocalCanvasKit,
+          rootDirectory: fileSystem.directory(projectRootPath),
         );
-        final Uri url = await device!.devFS!.create();
-        if (debuggingOptions.buildInfo.isDebug) {
+        Uri url = await device!.devFS!.create();
+        if (debuggingOptions.tlsCertKeyPath != null && debuggingOptions.tlsCertPath != null) {
+          url = url.replace(scheme: 'https');
+        }
+        if (debuggingOptions.buildInfo.isDebug && !debuggingOptions.webUseWasm) {
           await runSourceGenerators();
           final UpdateFSReport report = await _updateDevFS(fullRestart: true);
           if (!report.success) {
@@ -321,13 +344,14 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
             fileSystem: _fileSystem,
             flutterVersion: globals.flutterVersion,
             usage: globals.flutterUsage,
+            analytics: globals.analytics,
           );
           await webBuilder.buildWeb(
             flutterProject,
             target,
             debuggingOptions.buildInfo,
             ServiceWorkerStrategy.none,
-            compilerConfig: JsCompilerConfig.run(nativeNullAssertions: debuggingOptions.nativeNullAssertions)
+            compilerConfigs: <WebCompilerConfig>[_compilerConfig],
           );
         }
         await device!.device!.startApp(
@@ -335,13 +359,12 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
           mainPath: target,
           debuggingOptions: debuggingOptions,
           platformArgs: <String, Object>{
-            'uri': url.toString(),
+             'uri': url.toString(),
           },
         );
         return attach(
           connectionInfoCompleter: connectionInfoCompleter,
           appStartedCompleter: appStartedCompleter,
-          enableDevTools: enableDevTools,
         );
       });
     } on WebSocketException catch (error, stackTrace) {
@@ -360,11 +383,26 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
       appFailedToStart();
       _logger.printError('$error', stackTrace: stackTrace);
       throwToolExit(kExitMessage);
+    } on HttpException catch (error, stackTrace) {
+      appFailedToStart();
+      _logger.printError('$error', stackTrace: stackTrace);
+      throwToolExit(kExitMessage);
     } on Exception {
       appFailedToStart();
       rethrow;
     }
   }
+
+  WebCompilerConfig get _compilerConfig => (debuggingOptions.webUseWasm)
+    ? WasmCompilerConfig(
+        optimizationLevel: 0,
+        stripWasm: false,
+        renderer: debuggingOptions.webRenderer
+      )
+    : JsCompilerConfig.run(
+        nativeNullAssertions: debuggingOptions.nativeNullAssertions,
+        renderer: debuggingOptions.webRenderer,
+      );
 
   @override
   Future<OperationResult> restart({
@@ -379,7 +417,7 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
       progressId: 'hot.restart',
     );
 
-    if (debuggingOptions.buildInfo.isDebug) {
+    if (debuggingOptions.buildInfo.isDebug && !debuggingOptions.webUseWasm) {
       await runSourceGenerators();
       // Full restart is always false for web, since the extra recompile is wasteful.
       final UpdateFSReport report = await _updateDevFS();
@@ -399,13 +437,14 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
           fileSystem: _fileSystem,
           flutterVersion: globals.flutterVersion,
           usage: globals.flutterUsage,
+          analytics: globals.analytics,
         );
         await webBuilder.buildWeb(
           flutterProject,
           target,
           debuggingOptions.buildInfo,
           ServiceWorkerStrategy.none,
-          compilerConfig: JsCompilerConfig.run(nativeNullAssertions: debuggingOptions.nativeNullAssertions),
+          compilerConfigs: <WebCompilerConfig>[_compilerConfig],
         );
       } on ToolExit {
         return OperationResult(1, 'Failed to recompile application.');
@@ -416,7 +455,11 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
       if (!deviceIsDebuggable) {
         _logger.printStatus('Recompile complete. Page requires refresh.');
       } else if (isRunningDebug) {
-        await _vmService.service.callMethod('hotRestart');
+        // If the hot-restart service extension method is registered, then use
+        // it. Otherwise, default to calling "hotRestart" without a namespace.
+        final String hotRestartMethod =
+            _registeredMethodsForService['hotRestart'] ?? 'hotRestart';
+        await _vmService.service.callMethod(hotRestartMethod);
       } else {
         // On non-debug builds, a hard refresh is required to ensure the
         // up to date sources are loaded.
@@ -433,20 +476,36 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
     final Duration elapsed = _systemClock.now().difference(start);
     final String elapsedMS = getElapsedAsMilliseconds(elapsed);
     _logger.printStatus('Restarted application in $elapsedMS.');
+
     unawaited(residentDevtoolsHandler!.hotRestart(flutterDevices));
 
     // Don't track restart times for dart2js builds or web-server devices.
     if (debuggingOptions.buildInfo.isDebug && deviceIsDebuggable) {
       _usage.sendTiming('hot', 'web-incremental-restart', elapsed);
+      _analytics.send(Event.timing(
+        workflow: 'hot',
+        variableName: 'web-incremental-restart',
+        elapsedMilliseconds: elapsed.inMilliseconds,
+      ));
+      final String sdkName = await device!.device!.sdkNameAndVersion;
       HotEvent(
         'restart',
         targetPlatform: getNameForTargetPlatform(TargetPlatform.web_javascript),
-        sdkName: await device!.device!.sdkNameAndVersion,
+        sdkName: sdkName,
         emulator: false,
         fullRestart: true,
         reason: reason,
         overallTimeInMs: elapsed.inMilliseconds,
       ).send();
+      _analytics.send(Event.hotRunnerInfo(
+        label: 'restart',
+        targetPlatform: getNameForTargetPlatform(TargetPlatform.web_javascript),
+        sdkName: sdkName,
+        emulator: false,
+        fullRestart: true,
+        reason: reason,
+        overallTimeInMs: elapsed.inMilliseconds
+      ));
     }
     return OperationResult.ok;
   }
@@ -501,7 +560,7 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
     if (rebuildBundle) {
       _logger.printTrace('Updating assets');
       final int result = await assetBundle.build(
-        packagesPath: debuggingOptions.buildInfo.packagesPath,
+        packageConfigPath: debuggingOptions.buildInfo.packageConfigPath,
         targetPlatform: TargetPlatform.web_javascript,
       );
       if (result != 0) {
@@ -525,12 +584,10 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
       ),
       target: target,
       bundle: assetBundle,
-      firstBuildTime: firstBuildTime,
       bundleFirstUpload: isFirstUpload,
       generator: device!.generator!,
       fullRestart: fullRestart,
       dillOutputPath: dillOutputPath,
-      projectRootPath: projectRootPath,
       pathToReload: getReloadPath(fullRestart: fullRestart, swap: false),
       invalidatedFiles: invalidationResult.uris!,
       packageConfig: invalidationResult.packageConfig!,
@@ -538,7 +595,7 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
       shaderCompiler: device!.developmentShaderCompiler,
     );
     devFSStatus.stop();
-    _logger.printTrace('Synced ${getSizeAsMB(report.syncedBytes)}.');
+    _logger.printTrace('Synced ${getSizeAsPlatformMB(report.syncedBytes)}.');
     return report;
   }
 
@@ -547,15 +604,23 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
     Completer<DebugConnectionInfo>? connectionInfoCompleter,
     Completer<void>? appStartedCompleter,
     bool allowExistingDdsInstance = false,
-    bool enableDevTools = false, // ignored, we don't yet support devtools for web
     bool needsFullRestart = true,
   }) async {
     if (_chromiumLauncher != null) {
       final Chromium chrome = await _chromiumLauncher!.connectedInstance;
-      final ChromeTab? chromeTab = await chrome.chromeConnection.getTab((ChromeTab chromeTab) {
-        return !chromeTab.url.startsWith('chrome-extension');
-      }, retryFor: const Duration(seconds: 5));
+      final ChromeTab? chromeTab = await getChromeTabGuarded(
+        chrome.chromeConnection,
+        (ChromeTab chromeTab) {
+          return !chromeTab.url.startsWith('chrome-extension');
+        },
+        retryFor: const Duration(seconds: 5),
+        onIoError: (Object error, StackTrace stackTrace) {
+          // We were unable to unable to communicate with Chrome.
+          _logger.printError(error.toString(), stackTrace: stackTrace);
+        }
+      );
       if (chromeTab == null) {
+        appFailedToStart();
         throwToolExit('Failed to connect to Chrome instance.');
       }
       _wipConnection = await chromeTab.connect();
@@ -567,24 +632,31 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
       _connectionResult = await webDevFS.connect(useDebugExtension);
       unawaited(_connectionResult!.debugConnection!.onDone.whenComplete(_cleanupAndExit));
 
-      void onLogEvent(vmservice.Event event)  {
+      void onLogEvent(vmservice.Event event) {
         final String message = processVmServiceMessage(event);
         _logger.printStatus(message);
       }
 
       _stdOutSub = _vmService.service.onStdoutEvent.listen(onLogEvent);
       _stdErrSub = _vmService.service.onStderrEvent.listen(onLogEvent);
+      _serviceSub = _vmService.service.onServiceEvent.listen(_onServiceEvent);
       try {
         await _vmService.service.streamListen(vmservice.EventStreams.kStdout);
       } on vmservice.RPCError {
         // It is safe to ignore this error because we expect an error to be
-        // thrown if we're not already subscribed.
+        // thrown if we're already subscribed.
       }
       try {
         await _vmService.service.streamListen(vmservice.EventStreams.kStderr);
       } on vmservice.RPCError {
         // It is safe to ignore this error because we expect an error to be
-        // thrown if we're not already subscribed.
+        // thrown if we're already subscribed.
+      }
+      try {
+        await _vmService.service.streamListen(vmservice.EventStreams.kService);
+      } on vmservice.RPCError {
+        // It is safe to ignore this error because we expect an error to be
+        // thrown if we're already subscribed.
       }
       try {
         await _vmService.service.streamListen(vmservice.EventStreams.kIsolate);
@@ -602,7 +674,6 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
         vmService: _vmService.service,
       );
 
-
       websocketUri = Uri.parse(_connectionResult!.debugConnection!.uri);
       device!.vmService = _vmService;
 
@@ -613,21 +684,21 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
         _connectionResult!.appConnection!.runMain();
       } else {
         late StreamSubscription<void> resumeSub;
-        resumeSub = _vmService.service.onDebugEvent
-            .listen((vmservice.Event event) {
+        resumeSub = _vmService.service.onDebugEvent.listen((vmservice.Event event) {
           if (event.type == vmservice.EventKind.kResume) {
             _connectionResult!.appConnection!.runMain();
             resumeSub.cancel();
           }
         });
       }
-      if (enableDevTools) {
-        // The method below is guaranteed never to return a failing future.
-        unawaited(residentDevtoolsHandler!.serveAndAnnounceDevTools(
-          devToolsServerAddress: debuggingOptions.devToolsServerAddress,
-          flutterDevices: flutterDevices,
-        ));
-      }
+    }
+    // TODO(bkonyi): remove when ready to serve DevTools from DDS.
+    if (debuggingOptions.enableDevTools) {
+      // The method below is guaranteed never to return a failing future.
+      unawaited(residentDevtoolsHandler!.serveAndAnnounceDevTools(
+        devToolsServerAddress: debuggingOptions.devToolsServerAddress,
+        flutterDevices: flutterDevices,
+      ));
     }
     if (websocketUri != null) {
       if (debuggingOptions.vmserviceOutFile != null) {
@@ -636,7 +707,7 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
           ..writeAsStringSync(websocketUri.toString());
       }
       _logger.printStatus('Debug service listening on $websocketUri');
-      if (debuggingOptions.buildInfo.nullSafetyMode !=  NullSafetyMode.sound) {
+      if (debuggingOptions.buildInfo.nullSafetyMode != NullSafetyMode.sound) {
         _logger.printStatus('');
         _logger.printStatus(
           'Running without sound null safety ⚠️',
@@ -663,6 +734,18 @@ Please provide a valid TCP port (an integer between 0 and 65535, inclusive).
   Future<void> exitApp() async {
     await device!.exitApps();
     appFinished();
+  }
+
+  void _onServiceEvent(vmservice.Event e) {
+    if (e.kind == vmservice.EventKind.kServiceRegistered) {
+      final String serviceName = e.service!;
+      _registeredMethodsForService[serviceName] = e.method!;
+    }
+
+    if (e.kind == vmservice.EventKind.kServiceUnregistered) {
+      final String serviceName = e.service!;
+      _registeredMethodsForService.remove(serviceName);
+    }
   }
 }
 

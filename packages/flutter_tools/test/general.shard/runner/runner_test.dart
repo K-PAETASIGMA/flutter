@@ -7,8 +7,10 @@ import 'dart:async';
 import 'package:file/memory.dart';
 import 'package:flutter_tools/runner.dart' as runner;
 import 'package:flutter_tools/src/artifacts.dart';
+import 'package:flutter_tools/src/base/bot_detector.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/io.dart' as io;
+import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/net.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/base/process.dart';
@@ -24,14 +26,16 @@ import 'package:unified_analytics/unified_analytics.dart';
 import '../../src/common.dart';
 import '../../src/context.dart';
 import '../../src/fake_http_client.dart';
+import '../../src/fakes.dart';
 
 const String kCustomBugInstructions = 'These are instructions to report with a custom bug tracker.';
 
 void main() {
-  int? firstExitCode;
-  late MemoryFileSystem fileSystem;
+  group('runner (crash reporting)', () {
+    int? firstExitCode;
+    late MemoryFileSystem fileSystem;
+    late FakeAnalytics fakeAnalytics;
 
-  group('runner', () {
     setUp(() {
       // Instead of exiting with dart:io exit(), this causes an exception to
       // be thrown, which we catch with the onError callback in the zone below.
@@ -50,6 +54,11 @@ void main() {
 
       Cache.disableLocking();
       fileSystem = MemoryFileSystem.test();
+
+      fakeAnalytics = getInitializedFakeAnalyticsInstance(
+        fs: fileSystem,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      );
     });
 
     tearDown(() {
@@ -75,7 +84,7 @@ void main() {
           ));
           return null;
         },
-        onError: (Object error, StackTrace stack) { // ignore: deprecated_member_use
+        onError: (Object error, StackTrace stack) {
           expect(firstExitCode, isNotNull);
           expect(firstExitCode, isNot(0));
           expect(error.toString(), 'Exception: test exit');
@@ -92,6 +101,7 @@ void main() {
       // attempt.
       final CrashingUsage crashingUsage = globals.flutterUsage as CrashingUsage;
       expect(crashingUsage.sentException.toString(), 'Exception: an exception % --');
+      expect(fakeAnalytics.sentEvents, contains(Event.exception(exception: '_Exception')));
     }, overrides: <Type, Generator>{
       Platform: () => FakePlatform(environment: <String, String>{
         'FLUTTER_ANALYTICS_LOG_FILE': 'test',
@@ -102,6 +112,7 @@ void main() {
       Usage: () => CrashingUsage(),
       Artifacts: () => Artifacts.test(),
       HttpClientFactory: () => () => FakeHttpClient.any(),
+      Analytics: () => fakeAnalytics,
     });
 
     // This Completer completes when CrashingFlutterCommand.runCommand
@@ -128,7 +139,7 @@ void main() {
           ));
           return null;
         },
-        onError: (Object error, StackTrace stack) { // ignore: deprecated_member_use
+        onError: (Object error, StackTrace stack) {
           expect(firstExitCode, isNotNull);
           expect(firstExitCode, isNot(0));
           expect(error.toString(), 'Exception: test exit');
@@ -176,7 +187,7 @@ void main() {
           ));
           return null;
         },
-        onError: (Object error, StackTrace stack) { // ignore: deprecated_member_use
+        onError: (Object error, StackTrace stack) {
           expect(firstExitCode, isNotNull);
           expect(firstExitCode, isNot(0));
           expect(error.toString(), 'Exception: test exit');
@@ -271,7 +282,7 @@ void main() {
             ));
             return null;
           },
-          onError: (Object error, StackTrace stack) { // ignore: deprecated_member_use
+          onError: (Object error, StackTrace stack) {
             expect(firstExitCode, isNotNull);
             expect(firstExitCode, isNot(0));
             expect(error.toString(), 'Exception: test exit');
@@ -316,14 +327,122 @@ void main() {
     });
   });
 
+  group('runner', () {
+    late MemoryFileSystem fs;
+
+    setUp(() {
+      io.setExitFunctionForTests((int exitCode) {});
+
+      fs = MemoryFileSystem.test();
+
+      Cache.disableLocking();
+    });
+
+    tearDown(() {
+      io.restoreExitFunction();
+      Cache.enableLocking();
+    });
+
+    testUsingContext("catches ProcessException calling git because it's not available", () async {
+      final _GitNotFoundFlutterCommand command = _GitNotFoundFlutterCommand();
+
+      await runner.run(
+        <String>[command.name],
+        () => <FlutterCommand>[
+          command,
+        ],
+        // This flutterVersion disables crash reporting.
+        flutterVersion: '[user-branch]/',
+        reportCrashes: false,
+        shutdownHooks: ShutdownHooks(),
+      );
+
+      expect(
+          (globals.logger as BufferLogger).errorText,
+          'Failed to find "git" in the search path.\n'
+          '\n'
+          'An error was encountered when trying to run git.\n'
+          "Please ensure git is installed and available in your system's search path. "
+          'See https://docs.flutter.dev/get-started/install for instructions on installing git for your platform.\n');
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fs,
+        Artifacts: () => Artifacts.test(),
+        ProcessManager: () =>
+            FakeProcessManager.any()..excludedExecutables.add('git'),
+      },
+    );
+
+    testUsingContext('handles ProcessException calling git when ProcessManager.canRun fails', () async {
+      final _GitNotFoundFlutterCommand command = _GitNotFoundFlutterCommand();
+
+      await runner.run(
+        <String>[command.name],
+        () => <FlutterCommand>[
+          command,
+        ],
+        // This flutterVersion disables crash reporting.
+        flutterVersion: '[user-branch]/',
+        reportCrashes: false,
+        shutdownHooks: ShutdownHooks(),
+      );
+
+      expect(
+          (globals.logger as BufferLogger).errorText,
+          'Failed to find "git" in the search path.\n'
+          '\n'
+          'An error was encountered when trying to run git.\n'
+          "Please ensure git is installed and available in your system's search path. "
+          'See https://docs.flutter.dev/get-started/install for instructions on installing git for your platform.\n');
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => fs,
+        Artifacts: () => Artifacts.test(),
+        ProcessManager: () => _ErrorOnCanRunFakeProcessManager(),
+      },
+    );
+
+    testUsingContext('do not print welcome on bots', () async {
+        await runner.run(
+          <String>['--version', '--machine'],
+          () => <FlutterCommand>[],
+          // This flutterVersion disables crash reporting.
+          flutterVersion: '[user-branch]/',
+          shutdownHooks: ShutdownHooks(),
+        );
+
+        expect((globals.flutterUsage as TestUsage).printedWelcome, false);
+      },
+      overrides: <Type, Generator>{
+        FileSystem: () => MemoryFileSystem.test(),
+        ProcessManager: () => FakeProcessManager.any(),
+        BotDetector: () => const FakeBotDetector(true),
+        Usage: () => TestUsage(),
+      },
+    );
+  });
+
   group('unified_analytics', () {
+    late FakeAnalytics fakeAnalytics;
+    late MemoryFileSystem fs;
+    late TestUsage testUsage;
+
+    setUp(() {
+      fs = MemoryFileSystem.test();
+
+      fakeAnalytics = getInitializedFakeAnalyticsInstance(
+        fs: fs,
+        fakeFlutterVersion: FakeFlutterVersion(),
+      );
+      testUsage = TestUsage();
+    });
+
     testUsingContext(
       'runner disable telemetry with flag',
       () async {
         io.setExitFunctionForTests((int exitCode) {});
 
         expect(globals.analytics.telemetryEnabled, true);
-        expect(globals.analytics.shouldShowMessage, true);
 
         await runner.run(
           <String>['--disable-analytics'],
@@ -336,9 +455,88 @@ void main() {
         expect(globals.analytics.telemetryEnabled, false);
       },
       overrides: <Type, Generator>{
-        Analytics: () => FakeAnalytics(),
+        Analytics: () => fakeAnalytics,
         FileSystem: () => MemoryFileSystem.test(),
         ProcessManager: () => FakeProcessManager.any(),
+      },
+    );
+
+    testUsingContext(
+      'runner sends mismatch event to ga3 if user opted in to ga3 but out of ga4 analytics',
+      () async {
+        io.setExitFunctionForTests((int exitCode) {});
+
+        // Begin by opting out of telemetry for package:unified_analytics
+        // and leaving legacy analytics opted in
+        await fakeAnalytics.setTelemetry(false);
+        expect(fakeAnalytics.telemetryEnabled, false);
+        expect(testUsage.enabled, true);
+
+        await runner.run(
+          <String>[],
+          () => <FlutterCommand>[],
+          // This flutterVersion disables crash reporting.
+          flutterVersion: '[user-branch]/',
+          shutdownHooks: ShutdownHooks(),
+        );
+
+        expect(
+          testUsage.events,
+          contains(const TestUsageEvent(
+            'ga4_and_ga3_status_mismatch',
+            'opted_out_of_ga4',
+          )),
+        );
+        expect(fakeAnalytics.telemetryEnabled, false);
+        expect(testUsage.enabled, true);
+        expect(fakeAnalytics.sentEvents, isEmpty);
+
+      },
+      overrides: <Type, Generator>{
+        Analytics: () => fakeAnalytics,
+        FileSystem: () => MemoryFileSystem.test(),
+        ProcessManager: () => FakeProcessManager.any(),
+        Usage: () => testUsage,
+      },
+    );
+
+    testUsingContext(
+      'runner does not send mismatch event to ga3 if user opted out of ga3 & ga4 analytics',
+      () async {
+        io.setExitFunctionForTests((int exitCode) {});
+
+        // Begin by opting out of telemetry for package:unified_analytics
+        // and legacy analytics
+        await fakeAnalytics.setTelemetry(false);
+        testUsage.enabled = false;
+        expect(fakeAnalytics.telemetryEnabled, false);
+        expect(testUsage.enabled, false);
+
+        await runner.run(
+          <String>[],
+          () => <FlutterCommand>[],
+          // This flutterVersion disables crash reporting.
+          flutterVersion: '[user-branch]/',
+          shutdownHooks: ShutdownHooks(),
+        );
+
+        expect(
+          testUsage.events,
+          isNot(contains(const TestUsageEvent(
+            'ga4_and_ga3_status_mismatch',
+            'opted_out_of_ga4',
+          ))),
+        );
+        expect(fakeAnalytics.telemetryEnabled, false);
+        expect(testUsage.enabled, false);
+        expect(fakeAnalytics.sentEvents, isEmpty);
+
+      },
+      overrides: <Type, Generator>{
+        Analytics: () => fakeAnalytics,
+        FileSystem: () => MemoryFileSystem.test(),
+        ProcessManager: () => FakeProcessManager.any(),
+        Usage: () => testUsage,
       },
     );
 
@@ -347,8 +545,17 @@ void main() {
       () async {
         io.setExitFunctionForTests((int exitCode) {});
 
+        expect(globals.analytics.telemetryEnabled, true);
+
+        await runner.run(
+          <String>['--disable-analytics'],
+          () => <FlutterCommand>[],
+          // This flutterVersion disables crash reporting.
+          flutterVersion: '[user-branch]/',
+          shutdownHooks: ShutdownHooks(),
+        );
+
         expect(globals.analytics.telemetryEnabled, false);
-        expect(globals.analytics.shouldShowMessage, false);
 
         await runner.run(
           <String>['--enable-analytics'],
@@ -361,7 +568,7 @@ void main() {
         expect(globals.analytics.telemetryEnabled, true);
       },
       overrides: <Type, Generator>{
-        Analytics: () => FakeAnalytics(fakeTelemetryStatusOverride: false),
+        Analytics: () => fakeAnalytics,
         FileSystem: () => MemoryFileSystem.test(),
         ProcessManager: () => FakeProcessManager.any(),
       },
@@ -373,7 +580,6 @@ void main() {
         io.setExitFunctionForTests((int exitCode) {});
 
         expect(globals.analytics.telemetryEnabled, true);
-        expect(globals.analytics.shouldShowMessage, true);
 
         final int exitCode = await runner.run(
           <String>[
@@ -392,7 +598,7 @@ void main() {
             reason: 'Should not have changed from initialization');
       },
       overrides: <Type, Generator>{
-        Analytics: () => FakeAnalytics(),
+        Analytics: () => fakeAnalytics,
         FileSystem: () => MemoryFileSystem.test(),
         ProcessManager: () => FakeProcessManager.any(),
       },
@@ -433,6 +639,23 @@ class CrashingFlutterCommand extends FlutterCommand {
     _completer!.complete();
 
     return FlutterCommandResult.success();
+  }
+}
+
+class _GitNotFoundFlutterCommand extends FlutterCommand {
+  @override
+  String get description => '';
+
+  @override
+  String get name => 'git-not-found';
+
+  @override
+  Future<FlutterCommandResult> runCommand() {
+    throw const io.ProcessException(
+      'git',
+      <String>['log'],
+      'Failed to find "git" in the search path.',
+    );
   }
 }
 
@@ -537,37 +760,13 @@ class WaitingCrashReporter implements CrashReporter {
   }
 }
 
-/// A fake [Analytics] that will be used to test
-/// the --disable-analytics flag
-class FakeAnalytics extends Fake implements Analytics {
-
-  FakeAnalytics({bool fakeTelemetryStatusOverride = true})
-      : _fakeTelemetryStatus = fakeTelemetryStatusOverride,
-        _fakeShowMessage = fakeTelemetryStatusOverride;
-
-  // Both of the members below can be initialized with [fakeTelemetryStatusOverride]
-  // because if we pass in false for the status, that means we can also
-  // assume the message has been shown before
-  bool _fakeTelemetryStatus;
-  bool _fakeShowMessage;
-
+class _ErrorOnCanRunFakeProcessManager extends Fake implements FakeProcessManager {
+  final FakeProcessManager delegate = FakeProcessManager.any();
   @override
-  String get getConsentMessage => 'message';
-
-  @override
-  bool get shouldShowMessage => _fakeShowMessage;
-
-  @override
-  void clientShowedMessage() {
-    _fakeShowMessage = false;
+  bool canRun(dynamic executable, {String? workingDirectory}) {
+    if (executable == 'git') {
+      throw Exception("oh no, we couldn't check for git!");
+    }
+    return delegate.canRun(executable, workingDirectory: workingDirectory);
   }
-
-  @override
-  Future<void> setTelemetry(bool reportingBool) {
-    _fakeTelemetryStatus = reportingBool;
-    return Future<void>.value();
-  }
-
-  @override
-  bool get telemetryEnabled => _fakeTelemetryStatus;
 }

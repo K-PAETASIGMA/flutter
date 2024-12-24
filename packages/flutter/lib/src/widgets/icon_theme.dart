@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/material.dart';
+///
+/// @docImport 'icon.dart';
+/// @docImport 'image_icon.dart';
+library;
+
 import 'package:flutter/foundation.dart';
 
 import 'basic.dart';
@@ -76,6 +82,7 @@ class IconTheme extends InheritedTheme {
         color: iconThemeData.color ?? const IconThemeData.fallback().color,
         opacity: iconThemeData.opacity ?? const IconThemeData.fallback().opacity,
         shadows: iconThemeData.shadows ?? const IconThemeData.fallback().shadows,
+        applyTextScaling: iconThemeData.applyTextScaling ?? const IconThemeData.fallback().applyTextScaling,
       );
   }
 

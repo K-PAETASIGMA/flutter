@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'proxy_box.dart';
+library;
+
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:vector_math/vector_math_64.dart';
 
 import 'box.dart';
@@ -74,7 +78,8 @@ class RenderRotatedBox extends RenderBox with RenderObjectWithChildMixin<RenderB
   Matrix4? _paintTransform;
 
   @override
-  Size computeDryLayout(BoxConstraints constraints) {
+  @protected
+  Size computeDryLayout(covariant BoxConstraints constraints) {
     if (child == null) {
       return constraints.smallest;
     }

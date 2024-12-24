@@ -1,4 +1,7 @@
 {
+  "clearButtonLabel": "Borrar",
+  "searchWebButtonLabel": "Buscar en la Web",
+  "shareButtonLabel": "Compartir…",
   "lookUpButtonLabel": "Mirar hacia arriba",
   "noSpellCheckReplacementsLabel": "No se encontraron reemplazos",
   "menuDismissLabel": "Descartar menú",
@@ -23,6 +26,6 @@
   "cutButtonLabel": "Cortar",
   "copyButtonLabel": "Copiar",
   "pasteButtonLabel": "Pegar",
-  "selectAllButtonLabel": "Seleccionar todos",
+  "selectAllButtonLabel": "Seleccionar todo",
   "modalBarrierDismissLabel": "Descartar"
 }

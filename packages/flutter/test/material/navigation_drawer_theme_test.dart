@@ -5,7 +5,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 void main() {
   test('NavigationDrawerThemeData copyWith, ==, hashCode, basics', () {
@@ -19,7 +18,7 @@ void main() {
     expect(identical(NavigationDrawerThemeData.lerp(data, data, 0.5), data), true);
   });
 
-  testWidgetsWithLeakTracking('Default debugFillProperties', (WidgetTester tester) async {
+  testWidgets('Default debugFillProperties', (WidgetTester tester) async {
     final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
     const NavigationDrawerThemeData().debugFillProperties(builder);
 
@@ -31,7 +30,7 @@ void main() {
     expect(description, <String>[]);
   });
 
-  testWidgetsWithLeakTracking('NavigationDrawerThemeData implements debugFillProperties', (WidgetTester tester) async {
+  testWidgets('NavigationDrawerThemeData implements debugFillProperties', (WidgetTester tester) async {
     final DiagnosticPropertiesBuilder builder = DiagnosticPropertiesBuilder();
     const NavigationDrawerThemeData(
       tileHeight: 50,
@@ -54,20 +53,20 @@ void main() {
     expect(description, equalsIgnoringHashCodes(
       <String>[
         'tileHeight: 50.0',
-        'backgroundColor: Color(0x00000099)',
+        'backgroundColor: ${const Color(0x00000099)}',
         'elevation: 5.0',
-        'shadowColor: Color(0x00000098)',
-        'surfaceTintColor: Color(0x00000097)',
-        'indicatorColor: Color(0x00000096)',
+        'shadowColor: ${const Color(0x00000098)}',
+        'surfaceTintColor: ${const Color(0x00000097)}',
+        'indicatorColor: ${const Color(0x00000096)}',
         'indicatorShape: RoundedRectangleBorder(BorderSide(width: 0.0, style: none), BorderRadius.circular(2.0))',
         'indicatorSize: Size(10.0, 10.0)',
-        'labelTextStyle: MaterialStatePropertyAll(TextStyle(inherit: true, size: 7.0))',
-        'iconTheme: MaterialStatePropertyAll(IconThemeData#00000(color: Color(0x00000095)))'
+        'labelTextStyle: WidgetStatePropertyAll(TextStyle(inherit: true, size: 7.0))',
+        'iconTheme: WidgetStatePropertyAll(IconThemeData#00000(color: ${const Color(0x00000095)}))'
       ],
     ));
   });
 
-  testWidgetsWithLeakTracking(
+  testWidgets(
     'NavigationDrawerThemeData values are used when no NavigationDrawer properties are specified',
     (WidgetTester tester) async {
       final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
@@ -135,7 +134,7 @@ void main() {
       );
   });
 
-  testWidgetsWithLeakTracking(
+  testWidgets(
     'NavigationDrawer values take priority over NavigationDrawerThemeData values when both properties are specified',
     (WidgetTester tester) async {
       final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
@@ -197,7 +196,7 @@ void main() {
       expect(_getIndicatorDecoration(tester)?.shape, indicatorShape);
   });
 
-  testWidgetsWithLeakTracking('Local NavigationDrawerTheme takes priority over ThemeData.navigationDrawerTheme', (WidgetTester tester) async {
+  testWidgets('Local NavigationDrawerTheme takes priority over ThemeData.navigationDrawerTheme', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     const Color backgroundColor = Color(0x00000009);
     const double elevation = 7.0;

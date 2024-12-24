@@ -16,9 +16,11 @@ void main() {
   late Directory testDirectory;
   late File testTarget;
   late Device device;
+  late String perfTestOutputPath;
 
   setUp(() async {
     testDirectory = Directory.systemTemp.createTempSync('test_dir');
+    perfTestOutputPath = testOutputDirectory(testDirectory.absolute.path);
     testTarget = File('${testDirectory.absolute.path}/test_file')..createSync();
     device = const FakeDevice(deviceId: 'fakeDeviceId');
     deviceOperatingSystem = DeviceOperatingSystem.fake;
@@ -58,10 +60,13 @@ void main() {
       'average_vsync_transitions_missed': 1,
       '90th_percentile_vsync_transitions_missed': 1,
       '99th_percentile_vsync_transitions_missed': 1,
+      'average_frame_request_pending_latency': 0.1,
+      '90th_percentile_frame_request_pending_latency': 0.1,
+      '99th_percentile_frame_request_pending_latency': 0.1,
     };
     const String resultFileName = 'fake_result';
     void driveCallback(List<String> arguments) {
-      final File resultFile = File('${testDirectory.absolute.path}/build/$resultFileName.json')..createSync(recursive: true);
+      final File resultFile = File('$perfTestOutputPath/$resultFileName.json')..createSync(recursive: true);
       resultFile.writeAsStringSync(json.encode(fakeData));
     }
     final PerfTest perfTest = PerfTest(testDirectory.absolute.path, testTarget.absolute.path, 'test_file', resultFilename: resultFileName, device: device, flutterDriveCallback: driveCallback);
@@ -108,10 +113,13 @@ void main() {
       '90hz_frame_percentage': 0.4,
       '120hz_frame_percentage': 0.6,
       'illegal_refresh_rate_frame_count': 10,
+      'average_frame_request_pending_latency': 0.1,
+      '90th_percentile_frame_request_pending_latency': 0.1,
+      '99th_percentile_frame_request_pending_latency': 0.1,
     };
     const String resultFileName = 'fake_result';
     void driveCallback(List<String> arguments) {
-      final File resultFile = File('${testDirectory.absolute.path}/build/$resultFileName.json')..createSync(recursive: true);
+      final File resultFile = File('$perfTestOutputPath/$resultFileName.json')..createSync(recursive: true);
       resultFile.writeAsStringSync(json.encode(fakeData));
     }
     final PerfTest perfTest = PerfTest(testDirectory.absolute.path, testTarget.absolute.path, 'test_file', resultFilename: resultFileName, device: device, flutterDriveCallback: driveCallback);

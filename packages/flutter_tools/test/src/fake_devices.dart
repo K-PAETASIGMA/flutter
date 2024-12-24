@@ -9,6 +9,8 @@ import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/device.dart';
 import 'package:flutter_tools/src/project.dart';
 
+import 'fakes.dart';
+
 /// A list of fake devices to test JSON serialization
 /// (`Device.toJson()` and `--machine` flag for `devices` command)
 List<FakeDeviceJsonData> fakeDevices = <FakeDeviceJsonData>[
@@ -118,19 +120,25 @@ class FakeDevice extends Device {
     this.connectionInterface = DeviceConnectionInterface.attached,
     PlatformType type = PlatformType.web,
     LaunchResult? launchResult,
+    this.deviceLogReader,
+    bool supportsFlavors = false,
   }) : _isSupported = isSupported,
       _isSupportedForProject = isSupportedForProject,
       _launchResult = launchResult ?? LaunchResult.succeeded(),
+      _supportsFlavors = supportsFlavors,
       super(
         id,
         platformType: type,
         category: Category.mobile,
         ephemeral: ephemeral,
+        logger: FakeLogger(),
       );
 
   final bool _isSupported;
   final bool _isSupportedForProject;
+  final bool _supportsFlavors;
   final LaunchResult _launchResult;
+  DeviceLogReader? deviceLogReader;
 
   @override
   final String name;
@@ -173,6 +181,9 @@ class FakeDevice extends Device {
   bool isSupported() => _isSupported;
 
   @override
+  bool get supportsFlavors => _supportsFlavors;
+
+  @override
   bool isConnected;
 
   @override
@@ -183,6 +194,12 @@ class FakeDevice extends Device {
 
   @override
   Future<String> sdkNameAndVersion = Future<String>.value('Test SDK (1.2.3)');
+
+  @override
+  FutureOr<DeviceLogReader> getLogReader({
+    ApplicationPackage? app,
+    bool includePastLogs = false,
+  }) => deviceLogReader ?? FakeDeviceLogReader();
 }
 
 /// Combines fake device with its canonical JSON representation.
@@ -255,6 +272,11 @@ class FakePollingDeviceDiscovery extends PollingDeviceDiscovery {
 
   @override
   List<String> wellKnownIds = <String>[];
+
+  List<String> diagnostics = <String>[];
+
+  @override
+  Future<List<String>> getDiagnostics() => Future<List<String>>.value(diagnostics);
 }
 
 /// A fake implementation of the [DeviceLogReader].

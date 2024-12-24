@@ -91,13 +91,14 @@ class _FocusDemoState extends State<FocusDemo> {
     super.dispose();
   }
 
-  KeyEventResult _handleKeyPress(FocusNode node, RawKeyEvent event) {
-    if (event is RawKeyDownEvent) {
+  KeyEventResult _handleKeyPress(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) {
       print('Scope got key event: ${event.logicalKey}, $node');
-      print('Keys down: ${RawKeyboard.instance.keysPressed}');
+      print('Keys down: ${HardwareKeyboard.instance.logicalKeysPressed}');
       if (event.logicalKey == LogicalKeyboardKey.tab) {
         debugDumpFocusTree();
-        if (event.isShiftPressed) {
+        if (HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft)
+            || HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight)) {
           print('Moving to previous.');
           node.previousFocus();
           return KeyEventResult.handled;
@@ -107,20 +108,15 @@ class _FocusDemoState extends State<FocusDemo> {
           return KeyEventResult.handled;
         }
       }
-      if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-        node.focusInDirection(TraversalDirection.left);
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-        node.focusInDirection(TraversalDirection.right);
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-        node.focusInDirection(TraversalDirection.up);
-        return KeyEventResult.handled;
-      }
-      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-        node.focusInDirection(TraversalDirection.down);
+      final TraversalDirection? direction = switch (event.logicalKey) {
+        LogicalKeyboardKey.arrowLeft  => TraversalDirection.left,
+        LogicalKeyboardKey.arrowRight => TraversalDirection.right,
+        LogicalKeyboardKey.arrowUp    => TraversalDirection.up,
+        LogicalKeyboardKey.arrowDown  => TraversalDirection.down,
+        _ => null,
+      };
+      if (direction != null) {
+        node.focusInDirection(direction);
         return KeyEventResult.handled;
       }
     }
@@ -135,7 +131,7 @@ class _FocusDemoState extends State<FocusDemo> {
       policy: ReadingOrderTraversalPolicy(),
       child: FocusScope(
         debugLabel: 'Scope',
-        onKey: _handleKeyPress,
+        onKeyEvent: _handleKeyPress,
         autofocus: true,
         child: DefaultTextStyle(
           style: textTheme.headlineMedium!,

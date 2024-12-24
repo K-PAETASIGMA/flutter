@@ -3,7 +3,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-
 # ---------------------------------- NOTE ---------------------------------- #
 #
 # Please keep the logic in this file consistent with the logic in the
@@ -144,6 +143,11 @@ function upgrade_flutter () (
     touch "$FLUTTER_ROOT/bin/cache/.dartignore"
     "$FLUTTER_ROOT/bin/internal/update_dart_sdk.sh"
 
+    if [[ "$BIN_NAME" == 'dart' || "$BIN_NAME" == 'flutter-dev' ]]; then
+      # Don't try to build tool
+      return
+    fi
+
     >&2 echo Building flutter tool...
 
     # Prepare packages...
@@ -164,7 +168,7 @@ function upgrade_flutter () (
     fi
 
     # Compile...
-    "$DART" --verbosity=error --disable-dart-dev $FLUTTER_TOOL_ARGS --snapshot="$SNAPSHOT_PATH" --snapshot-kind="app-jit" --packages="$FLUTTER_TOOLS_DIR/.dart_tool/package_config.json" --no-enable-mirrors "$SCRIPT_PATH" > /dev/null
+    "$DART" --verbosity=error $FLUTTER_TOOL_ARGS --snapshot="$SNAPSHOT_PATH" --snapshot-kind="app-jit" --packages="$FLUTTER_TOOLS_DIR/.dart_tool/package_config.json" --no-enable-mirrors "$SCRIPT_PATH" > /dev/null
     echo "$compilekey" > "$STAMP_PATH"
 
     # Delete any temporary snapshot path.
@@ -229,6 +233,8 @@ function shared::execute() {
     exit 1
   fi
 
+  BIN_NAME="$(basename "$PROG_NAME")"
+
   # File descriptor 7 is prepared here so that we can use it with
   # flock(1) in _lock() (see above).
   #
@@ -247,12 +253,16 @@ function shared::execute() {
   # SHARED_NAME itself is prepared by the caller script.
   upgrade_flutter 7< "$SHARED_NAME"
 
-  BIN_NAME="$(basename "$PROG_NAME")"
   case "$BIN_NAME" in
+    flutter-dev)
+      # FLUTTER_TOOL_ARGS aren't quoted below, because it is meant to be
+      # considered as separate space-separated args.
+      exec "$DART" run --resident --packages="$FLUTTER_TOOLS_DIR/.dart_tool/package_config.json" $FLUTTER_TOOL_ARGS "$SCRIPT_PATH" "$@"
+      ;;
     flutter*)
       # FLUTTER_TOOL_ARGS aren't quoted below, because it is meant to be
       # considered as separate space-separated args.
-      exec "$DART" --disable-dart-dev --packages="$FLUTTER_TOOLS_DIR/.dart_tool/package_config.json" $FLUTTER_TOOL_ARGS "$SNAPSHOT_PATH" "$@"
+      exec "$DART" --packages="$FLUTTER_TOOLS_DIR/.dart_tool/package_config.json" $FLUTTER_TOOL_ARGS "$SNAPSHOT_PATH" "$@"
       ;;
     dart*)
       exec "$DART" "$@"

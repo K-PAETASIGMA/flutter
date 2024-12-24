@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 class TestIntent extends Intent {
   const TestIntent();
@@ -24,7 +23,7 @@ class TestAction extends Action<Intent> {
 }
 
 void main() {
-  testWidgetsWithLeakTracking('WidgetsApp with builder only', (WidgetTester tester) async {
+  testWidgets('WidgetsApp with builder only', (WidgetTester tester) async {
     final GlobalKey key = GlobalKey();
     await tester.pumpWidget(
       WidgetsApp(
@@ -38,7 +37,7 @@ void main() {
     expect(find.byKey(key), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp default key bindings', (WidgetTester tester) async {
+  testWidgets('WidgetsApp default key bindings', (WidgetTester tester) async {
     bool? checked = false;
     final GlobalKey key = GlobalKey();
     await tester.pumpWidget(
@@ -65,7 +64,7 @@ void main() {
     expect(checked, isTrue);
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp can override default key bindings', (WidgetTester tester) async {
+  testWidgets('WidgetsApp can override default key bindings', (WidgetTester tester) async {
     final TestAction action = TestAction();
     bool? checked = false;
     final GlobalKey key = GlobalKey();
@@ -102,7 +101,7 @@ void main() {
     expect(action.calls, equals(1));
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp default activation key mappings work', (WidgetTester tester) async {
+  testWidgets('WidgetsApp default activation key mappings work', (WidgetTester tester) async {
     bool? checked = false;
 
     await tester.pumpWidget(
@@ -147,7 +146,23 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.gameButtonA);
     await tester.pumpAndSettle();
     expect(checked, isTrue);
+
+    checked = false;
+    await tester.sendKeyEvent(LogicalKeyboardKey.select);
+    await tester.pumpAndSettle();
+    expect(checked, isTrue);
   }, variant: KeySimulatorTransitModeVariant.all());
+
+  testWidgets('Title is not created if title is not passed and kIsweb', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      WidgetsApp(
+        color: const Color(0xFF123456),
+        builder: (BuildContext context, Widget? child) => Container(),
+      ),
+    );
+
+    expect(find.byType(Title), kIsWeb ? findsNothing : findsOneWidget);
+  });
 
   group('error control test', () {
     Future<void> expectFlutterError({
@@ -169,7 +184,7 @@ void main() {
       }
     }
 
-    testWidgetsWithLeakTracking('push unknown route when onUnknownRoute is null', (WidgetTester tester) async {
+    testWidgets('push unknown route when onUnknownRoute is null', (WidgetTester tester) async {
       final GlobalKey<NavigatorState> key = GlobalKey<NavigatorState>();
       expectFlutterError(
         key: key,
@@ -197,7 +212,7 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('push unknown route when onUnknownRoute returns null', (WidgetTester tester) async {
+    testWidgets('push unknown route when onUnknownRoute returns null', (WidgetTester tester) async {
       final GlobalKey<NavigatorState> key = GlobalKey<NavigatorState>();
       expectFlutterError(
         key: key,
@@ -219,7 +234,7 @@ void main() {
     });
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp can customize initial routes', (WidgetTester tester) async {
+  testWidgets('WidgetsApp can customize initial routes', (WidgetTester tester) async {
     final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
     await tester.pumpWidget(
       WidgetsApp(
@@ -272,7 +287,7 @@ void main() {
     expect(find.text('regular page'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp.router works', (WidgetTester tester) async {
+  testWidgets('WidgetsApp.router works', (WidgetTester tester) async {
     final PlatformRouteInformationProvider provider = PlatformRouteInformationProvider(
       initialRouteInformation: RouteInformation(
         uri: Uri.parse('initial'),
@@ -304,14 +319,9 @@ void main() {
     await tester.binding.defaultBinaryMessenger.handlePlatformMessage('flutter/navigation', message, (_) { });
     await tester.pumpAndSettle();
     expect(find.text('popped'), findsOneWidget);
-  },
-  leakTrackingTestConfig: const LeakTrackingTestConfig(
-    // TODO(ksokolovskyi): remove after fixing
-    // https://github.com/flutter/flutter/issues/134205
-    notDisposedAllowList: <String, int?> {'_RestorableRouteInformation': 1},
-  ));
+  });
 
-  testWidgetsWithLeakTracking('WidgetsApp.router route information parser is optional', (WidgetTester tester) async {
+  testWidgets('WidgetsApp.router route information parser is optional', (WidgetTester tester) async {
     final SimpleNavigatorRouterDelegate delegate = SimpleNavigatorRouterDelegate(
       builder: (BuildContext context, RouteInformation information) {
         return Text(information.uri.toString());
@@ -336,14 +346,9 @@ void main() {
     await tester.binding.defaultBinaryMessenger.handlePlatformMessage('flutter/navigation', message, (_) { });
     await tester.pumpAndSettle();
     expect(find.text('popped'), findsOneWidget);
-  },
-  leakTrackingTestConfig: const LeakTrackingTestConfig(
-    // TODO(ksokolovskyi): remove after fixing
-    // https://github.com/flutter/flutter/issues/134205
-    notDisposedAllowList: <String, int?> {'_RestorableRouteInformation': 1},
-  ));
+  });
 
-  testWidgetsWithLeakTracking('WidgetsApp.router throw if route information provider is provided but no route information parser', (WidgetTester tester) async {
+  testWidgets('WidgetsApp.router throw if route information provider is provided but no route information parser', (WidgetTester tester) async {
     final SimpleNavigatorRouterDelegate delegate = SimpleNavigatorRouterDelegate(
       builder: (BuildContext context, RouteInformation information) {
         return Text(information.uri.toString());
@@ -372,7 +377,7 @@ void main() {
     }, throwsAssertionError);
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp.router throw if route configuration is provided along with other delegate', (WidgetTester tester) async {
+  testWidgets('WidgetsApp.router throw if route configuration is provided along with other delegate', (WidgetTester tester) async {
     final SimpleNavigatorRouterDelegate delegate = SimpleNavigatorRouterDelegate(
       builder: (BuildContext context, RouteInformation information) {
         return Text(information.uri.toString());
@@ -396,7 +401,7 @@ void main() {
     }, throwsAssertionError);
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp.router router config works', (WidgetTester tester) async {
+  testWidgets('WidgetsApp.router router config works', (WidgetTester tester) async {
     final SimpleNavigatorRouterDelegate delegate = SimpleNavigatorRouterDelegate(
       builder: (BuildContext context, RouteInformation information) {
         return Text(information.uri.toString());
@@ -432,14 +437,9 @@ void main() {
     await tester.binding.defaultBinaryMessenger.handlePlatformMessage('flutter/navigation', message, (_) { });
     await tester.pumpAndSettle();
     expect(find.text('popped'), findsOneWidget);
-  },
-  leakTrackingTestConfig: const LeakTrackingTestConfig(
-    // TODO(ksokolovskyi): remove after fixing
-    // https://github.com/flutter/flutter/issues/134205
-    notDisposedAllowList: <String, int?> {'_RestorableRouteInformation': 1},
-  ));
+  });
 
-  testWidgetsWithLeakTracking('WidgetsApp.router has correct default', (WidgetTester tester) async {
+  testWidgets('WidgetsApp.router has correct default', (WidgetTester tester) async {
     final SimpleNavigatorRouterDelegate delegate = SimpleNavigatorRouterDelegate(
       builder: (BuildContext context, RouteInformation information) {
         return Text(information.uri.toString());
@@ -453,14 +453,9 @@ void main() {
       color: const Color(0xFF123456),
     ));
     expect(find.text('/'), findsOneWidget);
-  },
-  leakTrackingTestConfig: const LeakTrackingTestConfig(
-    // TODO(ksokolovskyi): remove after fixing
-    // https://github.com/flutter/flutter/issues/134205
-    notDisposedAllowList: <String, int?> {'_RestorableRouteInformation': 1},
-  ));
+  });
 
-  testWidgetsWithLeakTracking('WidgetsApp has correct default ScrollBehavior', (WidgetTester tester) async {
+  testWidgets('WidgetsApp has correct default ScrollBehavior', (WidgetTester tester) async {
     late BuildContext capturedContext;
     await tester.pumpWidget(
       WidgetsApp(
@@ -601,7 +596,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking("WidgetsApp reports an exception if the selected locale isn't supported", (WidgetTester tester) async {
+  testWidgets("WidgetsApp reports an exception if the selected locale isn't supported", (WidgetTester tester) async {
     late final List<Locale>? localesArg;
     late final Iterable<Locale> supportedLocalesArg;
     await tester.pumpWidget(
@@ -625,7 +620,7 @@ void main() {
     expect(tester.takeException(), "Warning: This application's locale, C_UTF-8, is not supported by all of its localization delegates.");
   });
 
-  testWidgetsWithLeakTracking("WidgetsApp doesn't have dependency on MediaQuery", (WidgetTester tester) async {
+  testWidgets("WidgetsApp doesn't have dependency on MediaQuery", (WidgetTester tester) async {
     int routeBuildCount = 0;
 
     final Widget widget = WidgetsApp(
@@ -639,19 +634,19 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MediaQuery(data: const MediaQueryData(textScaleFactor: 10), child: widget),
+      MediaQuery(data: const MediaQueryData(textScaler: TextScaler.linear(10)), child: widget),
     );
 
     expect(routeBuildCount, equals(1));
 
     await tester.pumpWidget(
-      MediaQuery(data: const MediaQueryData(textScaleFactor: 20), child: widget),
+      MediaQuery(data: const MediaQueryData(textScaler: TextScaler.linear(20)), child: widget),
     );
 
     expect(routeBuildCount, equals(1));
   });
 
-  testWidgetsWithLeakTracking('WidgetsApp provides meta based shortcuts for iOS and macOS', (WidgetTester tester) async {
+  testWidgets('WidgetsApp provides meta based shortcuts for iOS and macOS', (WidgetTester tester) async {
     final FocusNode focusNode = FocusNode();
     addTearDown(focusNode.dispose);
 
@@ -744,7 +739,7 @@ void main() {
       await setAppLifeCycleState(AppLifecycleState.resumed);
     });
 
-    testWidgetsWithLeakTracking('WidgetsApp calls setFrameworkHandlesBack only when app is ready', (WidgetTester tester) async {
+    testWidgets('WidgetsApp calls setFrameworkHandlesBack only when app is ready', (WidgetTester tester) async {
       // Start in the `resumed` state, where setFrameworkHandlesBack should be
       // called like normal.
       await setAppLifeCycleState(AppLifecycleState.resumed);
@@ -771,24 +766,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(frameworkHandlesBacks.last, isFalse);
 
-      // Set the app state to inactive, where setFrameworkHandlesBack shouldn't
-      // be called.
+      // Set the app state to inactive, where setFrameworkHandlesBack is still
+      // called. This could happen when responding to a tap on a notification
+      // when the app is not active and immediately navigating, for example.
+      // See https://github.com/flutter/flutter/pull/154313.
       await setAppLifeCycleState(AppLifecycleState.inactive);
 
-      final int finalCallsLength = frameworkHandlesBacks.length;
+      final int inactiveStartCallsLength = frameworkHandlesBacks.length;
       const NavigationNotification(canHandlePop: true).dispatch(currentContext);
       await tester.pumpAndSettle();
-      expect(frameworkHandlesBacks, hasLength(finalCallsLength));
+      expect(frameworkHandlesBacks, hasLength(inactiveStartCallsLength + 1));
 
       const NavigationNotification(canHandlePop: false).dispatch(currentContext);
       await tester.pumpAndSettle();
-      expect(frameworkHandlesBacks, hasLength(finalCallsLength));
+      expect(frameworkHandlesBacks, hasLength(inactiveStartCallsLength + 2));
 
-      // Set the app state to detached, which also shouldn't call
-      // setFrameworkHandlesBack. Must go to paused, then detached.
-      await setAppLifeCycleState(AppLifecycleState.paused);
+      // Set the app state to detached, where setFrameworkHandlesBack shouldn't
+      // be called.
       await setAppLifeCycleState(AppLifecycleState.detached);
 
+      final int finalCallsLength = frameworkHandlesBacks.length;
       const NavigationNotification(canHandlePop: true).dispatch(currentContext);
       await tester.pumpAndSettle();
       expect(frameworkHandlesBacks, hasLength(finalCallsLength));
@@ -803,7 +800,7 @@ void main() {
   });
 }
 
-typedef SimpleRouterDelegateBuilder = Widget Function(BuildContext, RouteInformation);
+typedef SimpleRouterDelegateBuilder = Widget Function(BuildContext context, RouteInformation information);
 typedef SimpleNavigatorRouterDelegatePopPage<T> = bool Function(Route<T> route, T result, SimpleNavigatorRouterDelegate delegate);
 
 class SelectAllSpy extends Action<SelectAllTextIntent> {

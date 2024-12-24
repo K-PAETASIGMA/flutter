@@ -6,19 +6,18 @@ import 'package:flutter/material.dart';
 
 /// Flutter code sample for [MenuAnchor].
 
+void main() => runApp(const MenuAnchorApp());
+
 // This is the type used by the menu below.
 enum SampleItem { itemOne, itemTwo, itemThree }
-
-void main() => runApp(const MenuAnchorApp());
 
 class MenuAnchorApp extends StatelessWidget {
   const MenuAnchorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: ThemeData(useMaterial3: true),
-      home: const MenuAnchorExample(),
+    return const MaterialApp(
+      home: MenuAnchorExample(),
     );
   }
 }
@@ -36,11 +35,13 @@ class _MenuAnchorExampleState extends State<MenuAnchorExample> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('MenuAnchorButton')),
+      appBar: AppBar(
+        title: const Text('MenuAnchorButton'),
+        backgroundColor: Theme.of(context).primaryColorLight,
+      ),
       body: Center(
         child: MenuAnchor(
-          builder:
-              (BuildContext context, MenuController controller, Widget? child) {
+          builder: (BuildContext context, MenuController controller, Widget? child) {
             return IconButton(
               onPressed: () {
                 if (controller.isOpen) {
@@ -51,7 +52,8 @@ class _MenuAnchorExampleState extends State<MenuAnchorExample> {
               },
               icon: const Icon(Icons.more_horiz),
               tooltip: 'Show menu',
-            );},
+            );
+          },
           menuChildren: List<MenuItemButton>.generate(
             3,
             (int index) => MenuItemButton(

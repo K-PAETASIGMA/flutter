@@ -7,8 +7,6 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
-
 import '../widgets/semantics_tester.dart';
 
 void main() {
@@ -27,7 +25,7 @@ void main() {
     expect(dyDelta1, isNot(moreOrLessEquals(dyDelta2, epsilon: 0.1)));
   }
 
-  testWidgetsWithLeakTracking('Throw if enable drag without an animation controller', (WidgetTester tester) async {
+  testWidgets('Throw if enable drag without an animation controller', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/89168
     await tester.pumpWidget(
       MaterialApp(
@@ -54,7 +52,7 @@ void main() {
     FlutterError.onError = handler;
   });
 
-  testWidgetsWithLeakTracking('Disposing app while bottom sheet is disappearing does not crash', (WidgetTester tester) async {
+  testWidgets('Disposing app while bottom sheet is disappearing does not crash', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(
@@ -91,7 +89,7 @@ void main() {
     await tester.pumpWidget(Container());
   });
 
-  testWidgetsWithLeakTracking('Swiping down a BottomSheet should dismiss it by default', (WidgetTester tester) async {
+  testWidgets('Swiping down a BottomSheet should dismiss it by default', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     bool showBottomSheetThenCalled = false;
 
@@ -106,7 +104,7 @@ void main() {
     expect(showBottomSheetThenCalled, isFalse);
     expect(find.text('BottomSheet'), findsNothing);
 
-    scaffoldKey.currentState!.showBottomSheet<void>((BuildContext context) {
+    scaffoldKey.currentState!.showBottomSheet((BuildContext context) {
       return const SizedBox(
         height: 200.0,
         child:  Text('BottomSheet'),
@@ -126,7 +124,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Swiping down a BottomSheet should not dismiss it when enableDrag is false', (WidgetTester tester) async {
+  testWidgets('Swiping down a BottomSheet should not dismiss it when enableDrag is false', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     bool showBottomSheetThenCalled = false;
 
@@ -141,7 +139,7 @@ void main() {
     expect(showBottomSheetThenCalled, isFalse);
     expect(find.text('BottomSheet'), findsNothing);
 
-    scaffoldKey.currentState!.showBottomSheet<void>((BuildContext context) {
+    scaffoldKey.currentState!.showBottomSheet((BuildContext context) {
       return const SizedBox(
         height: 200.0,
         child: Text('BottomSheet'),
@@ -163,7 +161,7 @@ void main() {
     expect(find.text('BottomSheet'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Swiping down a BottomSheet should dismiss it when enableDrag is true', (WidgetTester tester) async {
+  testWidgets('Swiping down a BottomSheet should dismiss it when enableDrag is true', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     bool showBottomSheetThenCalled = false;
 
@@ -178,7 +176,7 @@ void main() {
     expect(showBottomSheetThenCalled, isFalse);
     expect(find.text('BottomSheet'), findsNothing);
 
-    scaffoldKey.currentState!.showBottomSheet<void>((BuildContext context) {
+    scaffoldKey.currentState!.showBottomSheet((BuildContext context) {
       return const SizedBox(
         height: 200.0,
         child: Text('BottomSheet'),
@@ -200,7 +198,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Tapping on a BottomSheet should not trigger a rebuild when enableDrag is true', (WidgetTester tester) async {
+  testWidgets('Tapping on a BottomSheet should not trigger a rebuild when enableDrag is true', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/126833.
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     int buildCount = 0;
@@ -216,7 +214,7 @@ void main() {
     expect(buildCount, 0);
     expect(find.text('BottomSheet'), findsNothing);
 
-    scaffoldKey.currentState!.showBottomSheet<void>((BuildContext context) {
+    scaffoldKey.currentState!.showBottomSheet((BuildContext context) {
       buildCount++;
       return const SizedBox(
         height: 200.0,
@@ -237,7 +235,7 @@ void main() {
     expect(find.text('BottomSheet'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Modal BottomSheet builder should only be called once', (WidgetTester tester) async {
+  testWidgets('Modal BottomSheet builder should only be called once', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -268,7 +266,7 @@ void main() {
     expect(numBuilderCalls, 1);
   });
 
-  testWidgetsWithLeakTracking('Tapping on a modal BottomSheet should not dismiss it', (WidgetTester tester) async {
+  testWidgets('Tapping on a modal BottomSheet should not dismiss it', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(
@@ -304,7 +302,7 @@ void main() {
     expect(showBottomSheetThenCalled, isFalse);
   });
 
-  testWidgetsWithLeakTracking('Tapping outside a modal BottomSheet should dismiss it by default', (WidgetTester tester) async {
+  testWidgets('Tapping outside a modal BottomSheet should dismiss it by default', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -338,7 +336,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Tapping outside a modal BottomSheet should dismiss it when isDismissible=true', (WidgetTester tester) async {
+  testWidgets('Tapping outside a modal BottomSheet should dismiss it when isDismissible=true', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -372,7 +370,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Verify that the BottomSheet animates non-linearly', (WidgetTester tester) async {
+  testWidgets('Verify that the BottomSheet animates non-linearly', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -405,7 +403,7 @@ void main() {
   });
 
   // Regression test for https://github.com/flutter/flutter/issues/121098
-  testWidgetsWithLeakTracking('Verify that accessibleNavigation has no impact on the BottomSheet animation', (WidgetTester tester) async {
+  testWidgets('Verify that accessibleNavigation has no impact on the BottomSheet animation', (WidgetTester tester) async {
     await tester.pumpWidget(MaterialApp(
       builder: (BuildContext context, Widget? child) {
         return MediaQuery(
@@ -430,7 +428,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgetsWithLeakTracking('Tapping outside a modal BottomSheet should not dismiss it when isDismissible=false', (WidgetTester tester) async {
+  testWidgets('Tapping outside a modal BottomSheet should not dismiss it when isDismissible=false', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(
@@ -467,7 +465,7 @@ void main() {
     expect(find.text('BottomSheet'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Swiping down a modal BottomSheet should dismiss it by default', (WidgetTester tester) async {
+  testWidgets('Swiping down a modal BottomSheet should dismiss it by default', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -502,7 +500,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Swiping down a modal BottomSheet should not dismiss it when enableDrag is false', (WidgetTester tester) async {
+  testWidgets('Swiping down a modal BottomSheet should not dismiss it when enableDrag is false', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -538,7 +536,7 @@ void main() {
     expect(find.text('BottomSheet'), findsOneWidget);
   });
 
-  testWidgetsWithLeakTracking('Swiping down a modal BottomSheet should dismiss it when enableDrag is true', (WidgetTester tester) async {
+  testWidgets('Swiping down a modal BottomSheet should dismiss it when enableDrag is true', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -573,7 +571,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Modal BottomSheet builder should only be called once', (WidgetTester tester) async {
+  testWidgets('Modal BottomSheet builder should only be called once', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(MaterialApp(
@@ -604,7 +602,7 @@ void main() {
     expect(numBuilderCalls, 1);
   });
 
-  testWidgetsWithLeakTracking('Verify that a downwards fling dismisses a persistent BottomSheet', (WidgetTester tester) async {
+  testWidgets('Verify that a downwards fling dismisses a persistent BottomSheet', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     bool showBottomSheetThenCalled = false;
 
@@ -618,7 +616,7 @@ void main() {
     expect(showBottomSheetThenCalled, isFalse);
     expect(find.text('BottomSheet'), findsNothing);
 
-    scaffoldKey.currentState!.showBottomSheet<void>((BuildContext context) {
+    scaffoldKey.currentState!.showBottomSheet((BuildContext context) {
       return Container(
         margin: const EdgeInsets.all(40.0),
         child: const Text('BottomSheet'),
@@ -661,7 +659,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('Verify that dragging past the bottom dismisses a persistent BottomSheet', (WidgetTester tester) async {
+  testWidgets('Verify that dragging past the bottom dismisses a persistent BottomSheet', (WidgetTester tester) async {
     // This is a regression test for https://github.com/flutter/flutter/issues/5528
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -672,7 +670,7 @@ void main() {
       ),
     ));
 
-    scaffoldKey.currentState!.showBottomSheet<void>((BuildContext context) {
+    scaffoldKey.currentState!.showBottomSheet((BuildContext context) {
       return Container(
         margin: const EdgeInsets.all(40.0),
         child: const Text('BottomSheet'),
@@ -691,7 +689,7 @@ void main() {
     expect(find.text('BottomSheet'), findsNothing);
   });
 
-  testWidgetsWithLeakTracking('modal BottomSheet has no top MediaQuery', (WidgetTester tester) async {
+  testWidgets('modal BottomSheet has no top MediaQuery', (WidgetTester tester) async {
     late BuildContext outerContext;
     late BuildContext innerContext;
 
@@ -742,7 +740,7 @@ void main() {
     );
   });
 
-  testWidgetsWithLeakTracking('modal BottomSheet can insert a SafeArea', (WidgetTester tester) async {
+  testWidgets('modal BottomSheet can insert a SafeArea', (WidgetTester tester) async {
     late BuildContext outerContext;
     late BuildContext innerContext;
 
@@ -814,7 +812,7 @@ void main() {
     expect(MediaQuery.of(innerContext).padding, const EdgeInsets.fromLTRB(0, 0, 0, 50.0));
   });
 
-  testWidgetsWithLeakTracking('modal BottomSheet has semantics', (WidgetTester tester) async {
+  testWidgets('modal BottomSheet has semantics', (WidgetTester tester) async {
     final SemanticsTester semantics = SemanticsTester(tester);
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -871,7 +869,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgetsWithLeakTracking('Verify that visual properties are passed through', (WidgetTester tester) async {
+  testWidgets('Verify that visual properties are passed through', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     const Color color = Colors.pink;
     const double elevation = 9.0;
@@ -911,7 +909,7 @@ void main() {
     expect(modalBarrier.color, barrierColor);
   });
 
-  testWidgetsWithLeakTracking('BottomSheet uses fallback values in material3',
+  testWidgets('Material3 - BottomSheet uses fallback values',
       (WidgetTester tester) async {
     const Color surfaceColor = Colors.pink;
     const Color surfaceTintColor = Colors.blue;
@@ -945,13 +943,14 @@ void main() {
     final Material material = tester.widget<Material>(finder);
 
     expect(material.color, surfaceColor);
-    expect(material.surfaceTintColor, surfaceTintColor);
+    // Surface tint is no longer used by default.
+    expect(material.surfaceTintColor, Colors.transparent);
     expect(material.elevation, 1.0);
     expect(material.shape, defaultShape);
     expect(tester.getSize(finder).width, 640);
   });
 
-  testWidgetsWithLeakTracking('BottomSheet has transparent shadow in material3', (WidgetTester tester) async {
+  testWidgets('Material3 - BottomSheet has transparent shadow', (WidgetTester tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: ThemeData(
         useMaterial3: true,
@@ -975,7 +974,7 @@ void main() {
     expect(material.shadowColor, Colors.transparent);
   });
 
-  testWidgetsWithLeakTracking('modal BottomSheet with scrollController has semantics', (WidgetTester tester) async {
+  testWidgets('Material2 - Modal BottomSheet with ScrollController has semantics', (WidgetTester tester) async {
     final SemanticsTester semantics = SemanticsTester(tester);
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -1048,12 +1047,89 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgetsWithLeakTracking('modal BottomSheet with drag handle has semantics', (WidgetTester tester) async {
+  testWidgets('Material3 - Modal BottomSheet with ScrollController has semantics', (WidgetTester tester) async {
     final SemanticsTester semantics = SemanticsTester(tester);
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
     await tester.pumpWidget(MaterialApp(
-      theme: ThemeData.light(useMaterial3: true),
+      theme: ThemeData(useMaterial3: true),
+      home: Scaffold(
+        key: scaffoldKey,
+        body: const Center(child: Text('body')),
+      ),
+    ));
+
+    showModalBottomSheet<void>(
+      context: scaffoldKey.currentContext!,
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          builder: (_, ScrollController controller) {
+            return SingleChildScrollView(
+              controller: controller,
+              child: const Text('BottomSheet'),
+            );
+          },
+        );
+      },
+    );
+
+    await tester.pump(); // bottom sheet show animation starts
+    await tester.pump(const Duration(seconds: 1)); // animation done
+
+    expect(semantics, hasSemantics(TestSemantics.root(
+      children: <TestSemantics>[
+        TestSemantics.rootChild(
+          children: <TestSemantics>[
+            TestSemantics(
+              children: <TestSemantics>[
+                TestSemantics(
+                  label: 'Dialog',
+                  textDirection: TextDirection.ltr,
+                  flags: <SemanticsFlag>[
+                    SemanticsFlag.scopesRoute,
+                    SemanticsFlag.namesRoute,
+                  ],
+                  children: <TestSemantics>[
+                    TestSemantics(
+                      children: <TestSemantics>[
+                        TestSemantics(
+                          flags: <SemanticsFlag>[SemanticsFlag.hasImplicitScrolling],
+                          children: <TestSemantics>[
+                            TestSemantics(
+                              label: 'BottomSheet',
+                              textDirection: TextDirection.ltr,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            TestSemantics(
+              children: <TestSemantics>[
+                TestSemantics(
+                  actions: <SemanticsAction>[SemanticsAction.tap, SemanticsAction.dismiss],
+                  label: 'Scrim',
+                  textDirection: TextDirection.ltr,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    ), ignoreTransform: true, ignoreRect: true, ignoreId: true));
+    semantics.dispose();
+  });
+
+  testWidgets('Material3 - Modal BottomSheet with drag handle has semantics', (WidgetTester tester) async {
+    final SemanticsTester semantics = SemanticsTester(tester);
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(useMaterial3: true),
       home: Scaffold(
         key: scaffoldKey,
         body: const Center(child: Text('body')),
@@ -1117,28 +1193,65 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgetsWithLeakTracking('Drag handle color can take MaterialStateProperty', (WidgetTester tester) async {
-    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+  testWidgets('Drag handle color can take MaterialStateProperty', (WidgetTester tester) async {
     const Color defaultColor=Colors.blue;
     const Color hoveringColor=Colors.green;
 
-    await tester.pumpWidget(MaterialApp(
-      theme: ThemeData.light(useMaterial3: true).copyWith(
-        bottomSheetTheme:  BottomSheetThemeData(
-          dragHandleColor: MaterialStateColor.resolveWith((Set<MaterialState> states) {
-            if (states.contains(MaterialState.hovered)) {
-              return hoveringColor;
-            }
-            return defaultColor;
-          }),
-        ),
-      ),
-      home: Scaffold(
-        key: scaffoldKey,
-        body: const Center(child: Text('body')),
-      ),
-    ));
+    Future<void> checkDragHandleAndColors() async {
+      await tester.pump(); // bottom sheet show animation starts
+      await tester.pump(const Duration(seconds: 1)); // animation done
 
+      final Finder dragHandle = find.bySemanticsLabel('Dismiss');
+      expect(
+        tester.getSize(dragHandle),
+        const Size(48, 48),
+      );
+      final Offset center = tester.getCenter(dragHandle);
+      final Offset edge = tester.getTopLeft(dragHandle) - const Offset(1, 1);
+
+      // Shows default drag handle color
+      final TestGesture gesture = await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
+      await gesture.addPointer(location: edge);
+      await tester.pump();
+      BoxDecoration boxDecoration=tester.widget<Container>(find.descendant(
+        of: dragHandle,
+        matching: find.byWidgetPredicate((Widget widget) => widget is Container && widget.decoration != null),
+      )).decoration! as BoxDecoration;
+      expect(boxDecoration.color, defaultColor);
+
+      // Shows hovering drag handle color
+      await gesture.moveTo(center);
+      await tester.pump();
+      boxDecoration = tester.widget<Container>(find.descendant(
+        of: dragHandle,
+        matching: find.byWidgetPredicate((Widget widget) => widget is Container && widget.decoration != null),
+      )).decoration! as BoxDecoration;
+
+      expect(boxDecoration.color, hoveringColor);
+      await gesture.removePointer();
+    }
+
+    Widget buildScaffold(GlobalKey scaffoldKey) {
+      return MaterialApp(
+        theme: ThemeData.light().copyWith(
+          bottomSheetTheme:  BottomSheetThemeData(
+            dragHandleColor: MaterialStateColor.resolveWith((Set<MaterialState> states) {
+              if (states.contains(MaterialState.hovered)) {
+                return hoveringColor;
+              }
+              return defaultColor;
+            }),
+          ),
+        ),
+        home: Scaffold(
+          key: scaffoldKey,
+          body: const Center(child: Text('body')),
+        ),
+      );
+    }
+
+    GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+    await tester.pumpWidget(buildScaffold(scaffoldKey));
 
     showModalBottomSheet<void>(
       context: scaffoldKey.currentContext!,
@@ -1148,41 +1261,102 @@ void main() {
       },
     );
 
-    await tester.pump(); // bottom sheet show animation starts
-    await tester.pump(const Duration(seconds: 1)); // animation done
+    await checkDragHandleAndColors();
+
+    await tester.pumpWidget(Container()); // Reset
+    scaffoldKey = GlobalKey<ScaffoldState>();
+    await tester.pumpWidget(buildScaffold(scaffoldKey));
+
+    scaffoldKey.currentState!.showBottomSheet((_) {
+      return Builder(
+        builder: (BuildContext context) {
+          return const SizedBox(
+            height: 200.0,
+            child: Text('Bottom Sheet'),
+          );
+        },
+      );
+    }, showDragHandle: true);
+
+    await checkDragHandleAndColors();
+  });
+
+  testWidgets('Drag handle interactive area size at minimum possible size', (WidgetTester tester) async {
+    Widget buildScaffold(GlobalKey scaffoldKey, {Size? dragHandleSize}) {
+      return MaterialApp(
+        theme: ThemeData.light().copyWith(
+          bottomSheetTheme:  BottomSheetThemeData(
+            dragHandleSize: dragHandleSize
+          ),
+        ),
+        home: Scaffold(
+          key: scaffoldKey,
+        ),
+      );
+    }
+
+    const Size smallerDragHandleSize = Size(20, 20);
+
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+    await tester.pumpWidget(buildScaffold(scaffoldKey, dragHandleSize: smallerDragHandleSize));
+
+    showModalBottomSheet<void>(
+      context: scaffoldKey.currentContext!,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return const Text('BottomSheet');
+      },
+    );
+
+    await tester.pump(); // Bottom sheet show animation starts.
+    await tester.pump(const Duration(seconds: 1)); // Animation done.
 
     final Finder dragHandle = find.bySemanticsLabel('Dismiss');
     expect(
       tester.getSize(dragHandle),
-      const Size(48, 48),
+      const Size(kMinInteractiveDimension, kMinInteractiveDimension),
     );
-    final Offset center = tester.getCenter(dragHandle);
-    final Offset edge = tester.getTopLeft(dragHandle) - const Offset(1, 1);
-
-    // Shows default drag handle color
-    final TestGesture gesture = await tester.createGesture(kind: PointerDeviceKind.mouse, pointer: 1);
-    await gesture.addPointer(location: edge);
-    await tester.pump();
-    BoxDecoration boxDecoration=tester.widget<Container>(find.descendant(
-      of: dragHandle,
-      matching: find.byWidgetPredicate((Widget widget) => widget is Container && widget.decoration != null),
-    )).decoration! as BoxDecoration;
-    expect(boxDecoration.color, defaultColor);
-
-    // Shows hovering drag handle color
-    await gesture.moveTo(center);
-    await tester.pump();
-    boxDecoration = tester.widget<Container>(find.descendant(
-     of: dragHandle,
-     matching: find.byWidgetPredicate((Widget widget) => widget is Container && widget.decoration != null),
-   )).decoration! as BoxDecoration;
-
-    expect(boxDecoration.color, hoveringColor);
   });
 
-  testWidgetsWithLeakTracking('showModalBottomSheet does not use root Navigator by default', (WidgetTester tester) async {
+  testWidgets('Drag handle interactive area size at given dragHandleSize', (WidgetTester tester) async {
+    Widget buildScaffold(GlobalKey scaffoldKey, {Size? dragHandleSize}) {
+      return MaterialApp(
+        theme: ThemeData.light().copyWith(
+          bottomSheetTheme: BottomSheetThemeData(
+            dragHandleSize: dragHandleSize
+          ),
+        ),
+        home: Scaffold(
+          key: scaffoldKey,
+        ),
+      );
+    }
+
+    const Size extendedDragHandleSize = Size(100, 50);
+
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+    await tester.pumpWidget(buildScaffold(scaffoldKey, dragHandleSize: extendedDragHandleSize));
+
+    showModalBottomSheet<void>(
+      context: scaffoldKey.currentContext!,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return const Text('BottomSheet');
+      },
+    );
+
+    await tester.pump(); // Bottom sheet show animation starts.
+    await tester.pump(const Duration(seconds: 1)); // Animation done.
+
+    final Finder dragHandle = find.bySemanticsLabel('Dismiss');
+    expect(
+      tester.getSize(dragHandle),
+      extendedDragHandleSize,
+    );
+  });
+
+  testWidgets('showModalBottomSheet does not use root Navigator by default', (WidgetTester tester) async {
     await tester.pumpWidget(MaterialApp(
-      theme: ThemeData(useMaterial3: false),
       home: Scaffold(
         body: Navigator(onGenerateRoute: (RouteSettings settings) => MaterialPageRoute<void>(builder: (_) {
           return const _TestPage();
@@ -1207,10 +1381,11 @@ void main() {
 
     // Bottom sheet is displayed in correct position within the inner navigator
     // and above the BottomNavigationBar.
-    expect(tester.getBottomLeft(find.byType(BottomSheet)).dy, 544.0);
+    final double tabBarHeight = tester.getSize(find.byType(BottomNavigationBar)).height;
+    expect(tester.getBottomLeft(find.byType(BottomSheet)).dy, 600 - tabBarHeight);
   });
 
-  testWidgetsWithLeakTracking('showModalBottomSheet uses root Navigator when specified', (WidgetTester tester) async {
+  testWidgets('showModalBottomSheet uses root Navigator when specified', (WidgetTester tester) async {
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: Navigator(onGenerateRoute: (RouteSettings settings) => MaterialPageRoute<void>(builder: (_) {
@@ -1239,7 +1414,7 @@ void main() {
     expect(tester.getBottomLeft(find.byType(BottomSheet)).dy, 600.0);
   });
 
-  testWidgetsWithLeakTracking('Verify that route settings can be set in the showModalBottomSheet', (WidgetTester tester) async {
+  testWidgets('Verify that route settings can be set in the showModalBottomSheet', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     const RouteSettings routeSettings = RouteSettings(name: 'route_name', arguments: 'route_argument');
 
@@ -1256,7 +1431,7 @@ void main() {
       context: scaffoldKey.currentContext!,
       routeSettings: routeSettings,
       builder: (BuildContext context) {
-        retrievedRouteSettings = ModalRoute.of(context)!.settings;
+        retrievedRouteSettings = ModalRoute.settingsOf(context)!;
         return const Text('BottomSheet');
       },
     );
@@ -1267,8 +1442,15 @@ void main() {
     expect(retrievedRouteSettings, routeSettings);
   });
 
-  testWidgetsWithLeakTracking('Verify showModalBottomSheet use AnimationController if provided.', (WidgetTester tester) async {
+  testWidgets('Verify showModalBottomSheet use AnimationController if provided.', (WidgetTester tester) async {
     const Key tapTarget = Key('tap-target');
+    final AnimationController controller = AnimationController(
+      vsync: const TestVSync(),
+      duration: const Duration(seconds: 2),
+      reverseDuration: const Duration(seconds: 2),
+    );
+    addTearDown(controller.dispose);
+
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: Builder(
@@ -1279,11 +1461,7 @@ void main() {
                 showModalBottomSheet<void>(
                   context: context,
                   // The default duration and reverseDuration is 1 second
-                  transitionAnimationController: AnimationController(
-                    vsync: const TestVSync(),
-                    duration: const Duration(seconds: 2),
-                    reverseDuration: const Duration(seconds: 2),
-                  ),
+                  transitionAnimationController: controller,
                   builder: (BuildContext context) {
                     return const Text('BottomSheet');
                   },
@@ -1324,7 +1502,7 @@ void main() {
   });
 
   // Regression test for https://github.com/flutter/flutter/issues/87592
-  testWidgetsWithLeakTracking('the framework do not dispose the transitionAnimationController provided by user.', (WidgetTester tester) async {
+  testWidgets('the framework do not dispose the transitionAnimationController provided by user.', (WidgetTester tester) async {
     const Key tapTarget = Key('tap-target');
     final AnimationController controller = AnimationController(
       vsync: const TestVSync(),
@@ -1386,9 +1564,16 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgetsWithLeakTracking('Verify persistence BottomSheet use AnimationController if provided.', (WidgetTester tester) async {
+  testWidgets('Verify persistence BottomSheet use AnimationController if provided.', (WidgetTester tester) async {
     const Key tapTarget = Key('tap-target');
     const Key tapTargetToClose = Key('tap-target-to-close');
+    final AnimationController controller = AnimationController(
+      vsync: const TestVSync(),
+      duration: const Duration(seconds: 2),
+      reverseDuration: const Duration(seconds: 2),
+    );
+    addTearDown(controller.dispose);
+
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: Builder(
@@ -1396,14 +1581,10 @@ void main() {
             return GestureDetector(
               key: tapTarget,
               onTap: () {
-                showBottomSheet<void>(
+                showBottomSheet(
                   context: context,
                   // The default duration and reverseDuration is 1 second
-                  transitionAnimationController: AnimationController(
-                    vsync: const TestVSync(),
-                    duration: const Duration(seconds: 2),
-                    reverseDuration: const Duration(seconds: 2),
-                  ),
+                  transitionAnimationController: controller,
                   builder: (BuildContext context) {
                     return ElevatedButton(
                       key: tapTargetToClose,
@@ -1448,7 +1629,7 @@ void main() {
   });
 
   // Regression test for https://github.com/flutter/flutter/issues/87708
-  testWidgetsWithLeakTracking('Each of the internal animation controllers should be disposed by the framework.', (WidgetTester tester) async {
+  testWidgets('Each of the internal animation controllers should be disposed by the framework.', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey();
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -1457,7 +1638,7 @@ void main() {
       ),
     ));
 
-    scaffoldKey.currentState!.showBottomSheet<void>((_) {
+    scaffoldKey.currentState!.showBottomSheet((_) {
       return Builder(
         builder: (BuildContext context) {
           return Container(height: 200.0);
@@ -1471,7 +1652,7 @@ void main() {
     // The first sheet's animation is still running.
 
     // Trigger the second sheet will remove the first sheet from tree.
-    scaffoldKey.currentState!.showBottomSheet<void>((_) {
+    scaffoldKey.currentState!.showBottomSheet((_) {
       return Builder(
         builder: (BuildContext context) {
           return Container(height: 200.0);
@@ -1491,9 +1672,9 @@ void main() {
   });
 
   // Regression test for https://github.com/flutter/flutter/issues/99627
-  testWidgetsWithLeakTracking('The old route entry should be removed when a new sheet popup', (WidgetTester tester) async {
+  testWidgets('The old route entry should be removed when a new sheet popup', (WidgetTester tester) async {
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey();
-    PersistentBottomSheetController<void>? sheetController;
+    PersistentBottomSheetController? sheetController;
 
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
@@ -1505,7 +1686,7 @@ void main() {
     final ModalRoute<dynamic> route = ModalRoute.of(scaffoldKey.currentContext!)!;
     expect(route.canPop, false);
 
-    scaffoldKey.currentState!.showBottomSheet<void>((_) {
+    scaffoldKey.currentState!.showBottomSheet((_) {
       return Builder(
         builder: (BuildContext context) {
           return Container(height: 200.0);
@@ -1518,7 +1699,7 @@ void main() {
     expect(route.canPop, true);
 
     // Trigger the second sheet will remove the first sheet from tree.
-    sheetController = scaffoldKey.currentState!.showBottomSheet<void>((_) {
+    sheetController = scaffoldKey.currentState!.showBottomSheet((_) {
       return Builder(
         builder: (BuildContext context) {
           return Container(height: 200.0);
@@ -1535,7 +1716,7 @@ void main() {
   });
 
   // Regression test for https://github.com/flutter/flutter/issues/87708
-  testWidgetsWithLeakTracking('The framework does not dispose of the transitionAnimationController provided by user.', (WidgetTester tester) async {
+  testWidgets('The framework does not dispose of the transitionAnimationController provided by user.', (WidgetTester tester) async {
     const Key tapTarget = Key('tap-target');
     const Key tapTargetToClose = Key('tap-target-to-close');
     final AnimationController controller = AnimationController(
@@ -1550,7 +1731,7 @@ void main() {
             return GestureDetector(
               key: tapTarget,
               onTap: () {
-                showBottomSheet<void>(
+                showBottomSheet(
                   context: context,
                   transitionAnimationController: controller,
                   builder: (BuildContext context) {
@@ -1591,9 +1772,9 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgetsWithLeakTracking('Calling PersistentBottomSheetController.close does not crash when it is not the current bottom sheet', (WidgetTester tester) async {
+  testWidgets('Calling PersistentBottomSheetController.close does not crash when it is not the current bottom sheet', (WidgetTester tester) async {
     // Regression test for https://github.com/flutter/flutter/issues/93717
-    PersistentBottomSheetController<void>? sheetController1;
+    PersistentBottomSheetController? sheetController1;
     await tester.pumpWidget(MaterialApp(
       home: Scaffold(
         body: Builder(builder: (BuildContext context) {
@@ -1603,7 +1784,7 @@ void main() {
                 ElevatedButton(
                   child: const Text('show 1'),
                   onPressed: () {
-                    sheetController1 = Scaffold.of(context).showBottomSheet<void>(
+                    sheetController1 = Scaffold.of(context).showBottomSheet(
                       (BuildContext context) => const Text('BottomSheet 1'),
                     );
                   },
@@ -1611,7 +1792,7 @@ void main() {
                 ElevatedButton(
                   child: const Text('show 2'),
                   onPressed: () {
-                    Scaffold.of(context).showBottomSheet<void>(
+                    Scaffold.of(context).showBottomSheet(
                       (BuildContext context) => const Text('BottomSheet 2'),
                     );
                   },
@@ -1643,7 +1824,7 @@ void main() {
     expect(find.text('BottomSheet 2'), findsOneWidget);
     });
 
-  testWidgetsWithLeakTracking('ModalBottomSheetRoute shows BottomSheet correctly', (WidgetTester tester) async {
+  testWidgets('ModalBottomSheetRoute shows BottomSheet correctly', (WidgetTester tester) async {
     late BuildContext savedContext;
 
     await tester.pumpWidget(
@@ -1673,7 +1854,7 @@ void main() {
   });
 
   group('Modal BottomSheet avoids overlapping display features', () {
-    testWidgetsWithLeakTracking('positioning using anchorPoint', (WidgetTester tester) async {
+    testWidgets('positioning using anchorPoint', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           builder: (BuildContext context, Widget? child) {
@@ -1711,7 +1892,7 @@ void main() {
       expect(tester.getBottomRight(find.byType(Placeholder)).dx, 800);
     });
 
-    testWidgetsWithLeakTracking('positioning using Directionality', (WidgetTester tester) async {
+    testWidgets('positioning using Directionality', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           builder: (BuildContext context, Widget? child) {
@@ -1751,7 +1932,7 @@ void main() {
       expect(tester.getBottomRight(find.byType(Placeholder)).dx, 800);
     });
 
-    testWidgetsWithLeakTracking('default positioning', (WidgetTester tester) async {
+    testWidgets('default positioning', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
           builder: (BuildContext context, Widget? child) {
@@ -1790,10 +1971,10 @@ void main() {
   });
 
   group('constraints', () {
-    testWidgetsWithLeakTracking('default constraints are max width 640 in material 3', (WidgetTester tester) async {
+    testWidgets('Material3 - Default constraints are max width 640', (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          theme: ThemeData.light(useMaterial3: true),
+          theme: ThemeData(useMaterial3: true),
           home: const MediaQuery(
             data: MediaQueryData(size: Size(1000, 1000)),
             child: Scaffold(
@@ -1806,8 +1987,9 @@ void main() {
       expect(tester.getSize(find.byType(Placeholder)).width, 640);
     });
 
-    testWidgetsWithLeakTracking('No constraints by default for bottomSheet property', (WidgetTester tester) async {
+    testWidgets('Material2 - No constraints by default for bottomSheet property', (WidgetTester tester) async {
       await tester.pumpWidget(MaterialApp(
+        // This test is specific to Material2 because Material3 sets constraints by default for BottomSheet.
         theme: ThemeData(useMaterial3: false),
         home: const Scaffold(
           body: Center(child: Text('body')),
@@ -1821,8 +2003,9 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('No constraints by default for showBottomSheet', (WidgetTester tester) async {
+    testWidgets('No constraints by default for showBottomSheet', (WidgetTester tester) async {
       await tester.pumpWidget(MaterialApp(
+        // This test is specific to Material2 because Material3 sets constraints by default for BottomSheet.
         theme: ThemeData(useMaterial3: false),
         home: Scaffold(
           body: Builder(builder: (BuildContext context) {
@@ -1830,7 +2013,7 @@ void main() {
               child: ElevatedButton(
                 child: const Text('Press me'),
                 onPressed: () {
-                  Scaffold.of(context).showBottomSheet<void>(
+                  Scaffold.of(context).showBottomSheet(
                     (BuildContext context) => const Text('BottomSheet'),
                   );
                 },
@@ -1849,8 +2032,9 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('No constraints by default for showModalBottomSheet', (WidgetTester tester) async {
+    testWidgets('No constraints by default for showModalBottomSheet', (WidgetTester tester) async {
       await tester.pumpWidget(MaterialApp(
+        // This test is specific to Material2 because Material3 sets constraints by default for BottomSheet.
         theme: ThemeData(useMaterial3: false),
         home: Scaffold(
           body: Builder(builder: (BuildContext context) {
@@ -1878,7 +2062,35 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('Theme constraints used for bottomSheet property', (WidgetTester tester) async {
+    testWidgets('Material3 - Theme constraints used for bottomSheet property', (WidgetTester tester) async {
+      const double sheetMaxWidth = 80.0;
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(
+          useMaterial3: true,
+          bottomSheetTheme: const BottomSheetThemeData(
+            constraints: BoxConstraints(maxWidth: sheetMaxWidth),
+          ),
+        ),
+        home: Scaffold(
+          body: const Center(child: Text('body')),
+          bottomSheet: const Text('BottomSheet'),
+          floatingActionButton: FloatingActionButton(onPressed: () {}, child: const Icon(Icons.add)),
+        ),
+      ));
+      expect(find.text('BottomSheet'), findsOneWidget);
+
+      // Should be centered and only 80dp wide.
+      final Rect bottomSheetRect = tester.getRect(find.text('BottomSheet'));
+      expect(bottomSheetRect.left, 800 / 2 - sheetMaxWidth / 2);
+      expect(bottomSheetRect.width, sheetMaxWidth);
+
+      // Ensure the FAB is overlapping the top of the sheet.
+      expect(find.byIcon(Icons.add), findsOneWidget);
+      final Rect iconRect = tester.getRect(find.byIcon(Icons.add));
+      expect(iconRect.top, bottomSheetRect.top - iconRect.height / 2);
+    });
+
+    testWidgets('Material2 - Theme constraints used for bottomSheet property', (WidgetTester tester) async {
       await tester.pumpWidget(MaterialApp(
         theme: ThemeData(
           useMaterial3: false,
@@ -1906,12 +2118,12 @@ void main() {
       );
     });
 
-    testWidgetsWithLeakTracking('Theme constraints used for showBottomSheet', (WidgetTester tester) async {
+    testWidgets('Theme constraints used for showBottomSheet', (WidgetTester tester) async {
+      const double sheetMaxWidth = 80.0;
       await tester.pumpWidget(MaterialApp(
         theme: ThemeData(
-          useMaterial3: false,
           bottomSheetTheme: const BottomSheetThemeData(
-            constraints: BoxConstraints(maxWidth: 80),
+            constraints: BoxConstraints(maxWidth: sheetMaxWidth),
           ),
         ),
         home: Scaffold(
@@ -1920,7 +2132,7 @@ void main() {
               child: ElevatedButton(
                 child: const Text('Press me'),
                 onPressed: () {
-                  Scaffold.of(context).showBottomSheet<void>(
+                  Scaffold.of(context).showBottomSheet(
                     (BuildContext context) => const Text('BottomSheet'),
                   );
                 },
@@ -1933,19 +2145,19 @@ void main() {
       await tester.tap(find.text('Press me'));
       await tester.pumpAndSettle();
       expect(find.text('BottomSheet'), findsOneWidget);
-      // Should be centered and only 80dp wide
-      expect(
-        tester.getRect(find.text('BottomSheet')),
-        const Rect.fromLTRB(360, 558, 440, 600),
-      );
+
+      // Should be centered and only 80dp wide.
+      final Rect bottomSheetRect = tester.getRect(find.text('BottomSheet'));
+      expect(bottomSheetRect.left, 800 / 2 - sheetMaxWidth / 2);
+      expect(bottomSheetRect.width, sheetMaxWidth);
     });
 
-    testWidgetsWithLeakTracking('Theme constraints used for showModalBottomSheet', (WidgetTester tester) async {
+    testWidgets('Theme constraints used for showModalBottomSheet', (WidgetTester tester) async {
+      const double sheetMaxWidth = 80.0;
       await tester.pumpWidget(MaterialApp(
         theme: ThemeData(
-          useMaterial3: false,
           bottomSheetTheme: const BottomSheetThemeData(
-            constraints: BoxConstraints(maxWidth: 80),
+            constraints: BoxConstraints(maxWidth: sheetMaxWidth),
           ),
         ),
         home: Scaffold(
@@ -1968,17 +2180,17 @@ void main() {
       await tester.tap(find.text('Press me'));
       await tester.pumpAndSettle();
       expect(find.text('BottomSheet'), findsOneWidget);
-      // Should be centered and only 80dp wide
-      expect(
-        tester.getRect(find.text('BottomSheet')),
-        const Rect.fromLTRB(360, 558, 440, 600),
-      );
+
+      // Should be centered and only 80dp wide.
+      final Rect bottomSheetRect = tester.getRect(find.text('BottomSheet'));
+      expect(bottomSheetRect.left, 800 / 2 - sheetMaxWidth / 2);
+      expect(bottomSheetRect.width, sheetMaxWidth);
     });
 
-    testWidgetsWithLeakTracking('constraints param overrides theme for showBottomSheet', (WidgetTester tester) async {
+    testWidgets('constraints param overrides theme for showBottomSheet', (WidgetTester tester) async {
+      const double sheetMaxWidth = 100.0;
       await tester.pumpWidget(MaterialApp(
         theme: ThemeData(
-          useMaterial3: false,
           bottomSheetTheme: const BottomSheetThemeData(
             constraints: BoxConstraints(maxWidth: 80),
           ),
@@ -1989,9 +2201,9 @@ void main() {
               child: ElevatedButton(
                 child: const Text('Press me'),
                 onPressed: () {
-                  Scaffold.of(context).showBottomSheet<void>(
+                  Scaffold.of(context).showBottomSheet(
                     (BuildContext context) => const Text('BottomSheet'),
-                    constraints: const BoxConstraints(maxWidth: 100),
+                    constraints: const BoxConstraints(maxWidth: sheetMaxWidth),
                   );
                 },
               ),
@@ -2003,17 +2215,17 @@ void main() {
       await tester.tap(find.text('Press me'));
       await tester.pumpAndSettle();
       expect(find.text('BottomSheet'), findsOneWidget);
-      // Should be centered and only 100dp wide instead of 80dp wide
-      expect(
-        tester.getRect(find.text('BottomSheet')),
-        const Rect.fromLTRB(350, 572, 450, 600),
-      );
+
+      // Should be centered and only 80dp wide.
+      final Rect bottomSheetRect = tester.getRect(find.text('BottomSheet'));
+      expect(bottomSheetRect.left, 800 / 2 - sheetMaxWidth / 2);
+      expect(bottomSheetRect.width, sheetMaxWidth);
     });
 
-    testWidgetsWithLeakTracking('constraints param overrides theme for showModalBottomSheet', (WidgetTester tester) async {
+    testWidgets('constraints param overrides theme for showModalBottomSheet', (WidgetTester tester) async {
+      const double sheetMaxWidth = 100.0;
       await tester.pumpWidget(MaterialApp(
         theme: ThemeData(
-          useMaterial3: false,
           bottomSheetTheme: const BottomSheetThemeData(
             constraints: BoxConstraints(maxWidth: 80),
           ),
@@ -2027,7 +2239,7 @@ void main() {
                   showModalBottomSheet<void>(
                     context: context,
                     builder: (BuildContext context) => const Text('BottomSheet'),
-                    constraints: const BoxConstraints(maxWidth: 100),
+                    constraints: const BoxConstraints(maxWidth: sheetMaxWidth),
                   );
                 },
               ),
@@ -2039,11 +2251,11 @@ void main() {
       await tester.tap(find.text('Press me'));
       await tester.pumpAndSettle();
       expect(find.text('BottomSheet'), findsOneWidget);
-      // Should be centered and only 100dp instead of 80dp wide
-      expect(
-        tester.getRect(find.text('BottomSheet')),
-        const Rect.fromLTRB(350, 572, 450, 600),
-      );
+
+      // Should be centered and only 80dp wide.
+      final Rect bottomSheetRect = tester.getRect(find.text('BottomSheet'));
+      expect(bottomSheetRect.left, 800 / 2 - sheetMaxWidth / 2);
+      expect(bottomSheetRect.width, sheetMaxWidth);
     });
 
     group('scrollControlDisabledMaxHeightRatio', () {
@@ -2088,20 +2300,20 @@ void main() {
         );
       }
 
-      testWidgetsWithLeakTracking('works at 9 / 16', (WidgetTester tester) {
+      testWidgets('works at 9 / 16', (WidgetTester tester) {
         return test(tester, false, 9.0 / 16.0);
       });
-      testWidgetsWithLeakTracking('works at 8 / 16', (WidgetTester tester) {
+      testWidgets('works at 8 / 16', (WidgetTester tester) {
         return test(tester, false, 8.0 / 16.0);
       });
-      testWidgetsWithLeakTracking('works at isScrollControlled', (WidgetTester tester) {
+      testWidgets('works at isScrollControlled', (WidgetTester tester) {
         return test(tester, true, 8.0 / 16.0);
       });
     });
   });
 
   group('showModalBottomSheet modalBarrierDismissLabel', () {
-    testWidgetsWithLeakTracking('Verify that modalBarrierDismissLabel is used if provided',
+    testWidgets('Verify that modalBarrierDismissLabel is used if provided',
         (WidgetTester tester) async {
       final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
       const String customLabel = 'custom label';
@@ -2127,7 +2339,7 @@ void main() {
       expect(modalBarrier.semanticsLabel, customLabel);
     });
 
-    testWidgetsWithLeakTracking('Verify that modalBarrierDismissLabel from context is used if barrierLabel is not provided',
+    testWidgets('Verify that modalBarrierDismissLabel from context is used if barrierLabel is not provided',
         (WidgetTester tester) async {
       final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
       await tester.pumpWidget(MaterialApp(
@@ -2150,6 +2362,323 @@ void main() {
           tester.widget(find.byType(ModalBarrier).last);
       expect(modalBarrier.semanticsLabel, MaterialLocalizations.of(scaffoldKey.currentContext!).scrimLabel);
     });
+  });
+
+  testWidgets('Bottom sheet animation can be customized', (WidgetTester tester) async {
+    final Key sheetKey = UniqueKey();
+
+    Widget buildWidget({ AnimationStyle? sheetAnimationStyle }) {
+      return MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (BuildContext context) {
+              return GestureDetector(
+                onTap: () {
+                  showBottomSheet(
+                    context: context,
+                    sheetAnimationStyle: sheetAnimationStyle,
+                    builder: (BuildContext context) {
+                      return SizedBox.expand(
+                        child: ColoredBox(
+                          key: sheetKey,
+                          color: Theme.of(context).colorScheme.primary,
+                          child: FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: const Text('Close'),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+                child: const Text('X'),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    // Test custom animation style.
+    await tester.pumpWidget(buildWidget(
+      sheetAnimationStyle: AnimationStyle(
+        duration: const Duration(milliseconds: 800),
+        reverseDuration: const Duration(milliseconds: 400),
+      ),
+    ));
+    await tester.tap(find.text('X'));
+    await tester.pump();
+    // Advance the animation by 1/2 of the custom forward duration.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // The bottom sheet is partially visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, closeTo(134.6, 0.1));
+
+    // Advance the animation by 1/2 of the custom forward duration.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // The bottom sheet is fully visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(0.0));
+
+    // Dismiss the bottom sheet.
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pump();
+    // Advance the animation by 1/2 of the custom reverse duration.
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // The bottom sheet is partially visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, closeTo(134.6, 0.1));
+
+    // Advance the animation by 1/2 of the custom reverse duration.
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // The bottom sheet is dismissed.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(600.0));
+
+    // Test no animation style.
+    await tester.pumpWidget(buildWidget(sheetAnimationStyle: AnimationStyle.noAnimation));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('X'));
+    await tester.pump();
+
+    // The bottom sheet is fully visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(0.0));
+
+    // Dismiss the bottom sheet.
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pump();
+
+    // The bottom sheet is dismissed.
+    expect(find.byKey(sheetKey), findsNothing);
+  });
+
+  testWidgets('Modal bottom sheet default animation', (WidgetTester tester) async {
+    final Key sheetKey = UniqueKey();
+
+    // Test default modal bottom sheet animation.
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (BuildContext context) {
+            return GestureDetector(
+              onTap: () {
+                showModalBottomSheet<void>(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return SizedBox.expand(
+                      child: ColoredBox(
+                        key: sheetKey,
+                        color: Theme.of(context).colorScheme.primary,
+                        child: FilledButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Close'),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+              child: const Text('X'),
+            );
+          },
+        ),
+      ),
+    ));
+
+    // Tap the 'X' to show the bottom sheet.
+    await tester.tap(find.text('X'));
+    await tester.pump();
+    // Advance the animation by 1/2 of the default forward duration.
+    await tester.pump(const Duration(milliseconds: 125));
+
+    // The modal bottom sheet is partially visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, closeTo(316.7, 0.1));
+
+    // Advance the animation by 1/2 of the default forward duration.
+    await tester.pump(const Duration(milliseconds: 125));
+
+    // The modal bottom sheet is fully visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(262.5));
+
+    // Dismiss the bottom sheet.
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pump();
+    // Advance the animation by 1/2 of the default reverse duration.
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // The modal bottom sheet is partially visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, closeTo(316.7, 0.1));
+
+    // Advance the animation by 1/2 of the default reverse duration.
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // The modal bottom sheet is dismissed.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(600.0));
+  });
+
+  testWidgets('Modal bottom sheet animation can be customized', (WidgetTester tester) async {
+    final Key sheetKey = UniqueKey();
+
+    Widget buildWidget({ AnimationStyle? sheetAnimationStyle }) {
+      return MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (BuildContext context) {
+              return GestureDetector(
+                onTap: () {
+                  showModalBottomSheet<void>(
+                    context: context,
+                    sheetAnimationStyle: sheetAnimationStyle,
+                    builder: (BuildContext context) {
+                      return SizedBox.expand(
+                        child: ColoredBox(
+                          key: sheetKey,
+                          color: Theme.of(context).colorScheme.primary,
+                          child: FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: const Text('Close'),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+                child: const Text('X'),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    // Test custom animation style.
+    await tester.pumpWidget(buildWidget(
+      sheetAnimationStyle: AnimationStyle(
+        duration: const Duration(milliseconds: 800),
+        reverseDuration: const Duration(milliseconds: 400),
+      ),
+    ));
+    await tester.tap(find.text('X'));
+    await tester.pump();
+    // Advance the animation by 1/2 of the custom forward duration.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // The bottom sheet is partially visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, closeTo(316.7, 0.1));
+
+    // Advance the animation by 1/2 of the custom forward duration.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // The bottom sheet is fully visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(262.5));
+
+    // Dismiss the bottom sheet.
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pump();
+    // Advance the animation by 1/2 of the custom reverse duration.
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // The bottom sheet is partially visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, closeTo(316.7, 0.1));
+
+    // Advance the animation by 1/2 of the custom reverse duration.
+    await tester.pump(const Duration(milliseconds: 200));
+
+    // The bottom sheet is dismissed.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(600.0));
+
+    // Test no animation style.
+    await tester.pumpWidget(buildWidget(sheetAnimationStyle: AnimationStyle.noAnimation));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('X'));
+    await tester.pump();
+
+    // The bottom sheet is fully visible.
+    expect(tester.getTopLeft(find.byKey(sheetKey)).dy, equals(262.5));
+
+    // Dismiss the bottom sheet.
+    await tester.tap(find.widgetWithText(FilledButton, 'Close'));
+    await tester.pump();
+
+    // The bottom sheet is dismissed.
+    expect(find.byKey(sheetKey), findsNothing);
+  });
+
+  testWidgets('Setting ModalBottomSheetRoute.requestFocus to false does not request focus on the bottom sheet', (WidgetTester tester) async {
+    late BuildContext savedContext;
+    final FocusNode focusNode = FocusNode();
+    addTearDown(focusNode.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Material(
+          child: Builder(
+            builder: (BuildContext context) {
+              savedContext = context;
+              return TextField(focusNode: focusNode);
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    FocusNode? getTextFieldFocusNode() {
+      return tester.widget<Focus>(find.descendant(
+        of: find.byType(TextField),
+        matching: find.byType(Focus),
+      )).focusNode;
+    }
+
+    // Initially, there is no bottom sheet and the text field has no focus.
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(getTextFieldFocusNode()?.hasFocus, false);
+
+    // Request focus on the text field.
+    focusNode.requestFocus();
+    await tester.pump();
+    expect(getTextFieldFocusNode()?.hasFocus, true);
+
+    // Bring up bottom sheet.
+    final NavigatorState navigator = Navigator.of(savedContext);
+    navigator.push(
+      ModalBottomSheetRoute<void>(
+        isScrollControlled: false,
+        builder: (BuildContext context) => Container(),
+      ),
+    );
+    await tester.pump();
+
+    // The bottom sheet is showing and the text field has lost focus.
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(getTextFieldFocusNode()?.hasFocus, false);
+
+    // Dismiss the bottom sheet.
+    navigator.pop();
+    await tester.pump();
+
+    // The bottom sheet is dismissed and the focus is shifted back to the text field.
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(getTextFieldFocusNode()?.hasFocus, true);
+
+    // Bring up bottom sheet again with requestFocus to false.
+    navigator.push(
+      ModalBottomSheetRoute<void>(
+        requestFocus: false,
+        isScrollControlled: false,
+        builder: (BuildContext context) => Container(),
+      ),
+    );
+    await tester.pump();
+
+    // The bottom sheet is showing and the text field still has focus.
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(getTextFieldFocusNode()?.hasFocus, true);
   });
 }
 

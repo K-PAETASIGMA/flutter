@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport '_goldens_io.dart';
+library;
+
+import 'dart:convert' show LineSplitter;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -14,7 +18,7 @@ import 'package:matcher/expect.dart';
 import 'package:matcher/src/expect/async_matcher.dart'; // ignore: implementation_imports
 import 'package:vector_math/vector_math_64.dart' show Matrix3;
 
-import '_matchers_io.dart' if (dart.library.html) '_matchers_web.dart' show MatchesGoldenFile, captureImage;
+import '_matchers_io.dart' if (dart.library.js_interop) '_matchers_web.dart' show MatchesGoldenFile, captureImage;
 import 'accessibility.dart';
 import 'binding.dart';
 import 'controller.dart';
@@ -217,11 +221,29 @@ const Matcher isInCard = _IsInCard();
 ///  * [isInCard], the opposite.
 const Matcher isNotInCard = _IsNotInCard();
 
+/// Default threshold for [isSameColorAs] and [isSameColorSwatchAs].
+const double colorEpsilon = 0.004;
+
+/// Asserts that the object represents the same color swatch as [color] when
+/// used to paint.
+///
+/// Specifically this matcher checks the object is of type [ColorSwatch] and its
+/// color components fall below the delta specified by [threshold].
+///
+/// Note: This doesn't recurse into the swatches [Color] type, instead treating
+/// them as [Color]s.
+Matcher isSameColorSwatchAs<T>(ColorSwatch<T> color,
+    {double threshold = colorEpsilon}) {
+  return _ColorSwatchMatcher<T>(color, threshold);
+}
+
 /// Asserts that the object represents the same color as [color] when used to paint.
 ///
-/// Specifically this matcher checks the object is of type [Color] and its [Color.value]
-/// equals to that of the given [color].
-Matcher isSameColorAs(Color color) => _ColorMatcher(targetColor: color);
+/// Specifically this matcher checks the object is of type [Color] and its color
+/// components fall below the delta specified by [threshold].
+Matcher isSameColorAs(Color color, {double threshold = colorEpsilon}) {
+  return _ColorMatcher(color, threshold);
+}
 
 /// Asserts that an object's toString() is a plausible one-line description.
 ///
@@ -538,7 +560,7 @@ Matcher coversSameAreaAs(Path expectedPath, { required Rect areaToCompare, int s
 ///
 /// See also:
 ///
-///  * [GoldenFileComparator], which acts as the backend for this matcher.
+///  * [goldenFileComparator], which acts as the backend for this matcher.
 ///  * [LocalFileComparator], which is the default [GoldenFileComparator]
 ///    implementation for `flutter test`.
 ///  * [matchesReferenceImage], which should be used instead if you want to
@@ -546,12 +568,11 @@ Matcher coversSameAreaAs(Path expectedPath, { required Rect areaToCompare, int s
 ///  * [flutter_test] for a discussion of test configurations, whereby callers
 ///    may swap out the backend for this matcher.
 AsyncMatcher matchesGoldenFile(Object key, {int? version}) {
-  if (key is Uri) {
-    return MatchesGoldenFile(key, version);
-  } else if (key is String) {
-    return MatchesGoldenFile.forStringPath(key, version);
-  }
-  throw ArgumentError('Unexpected type for golden file: ${key.runtimeType}');
+  return switch (key) {
+    Uri()    => MatchesGoldenFile(key, version),
+    String() => MatchesGoldenFile.forStringPath(key, version),
+    _ => throw ArgumentError('Unexpected type for golden file: ${key.runtimeType}'),
+  };
 }
 
 /// Asserts that a [Finder], [Future<ui.Image>], or [ui.Image] matches a
@@ -600,7 +621,11 @@ AsyncMatcher matchesReferenceImage(ui.Image image) {
 /// provided, then they are not part of the comparison. All of the boolean
 /// flag and action fields must match, and default to false.
 ///
-/// To retrieve the semantics data of a widget, use [WidgetTester.getSemantics]
+/// To find a [SemanticsNode] directly, use [CommonFinders.semantics].
+/// These methods will search the semantics tree directly and avoid the edge
+/// cases that [SemanticsController.find] sometimes runs into.
+///
+/// To retrieve the semantics data of a widget, use [SemanticsController.find]
 /// with a [Finder] that returns a single widget. Semantics must be enabled
 /// in order to use this method.
 ///
@@ -620,6 +645,7 @@ AsyncMatcher matchesReferenceImage(ui.Image image) {
 ///   * [SemanticsController.find] under [WidgetTester.semantics], the tester method which retrieves semantics.
 ///   * [containsSemantics], a similar matcher without default values for flags or actions.
 Matcher matchesSemantics({
+  String? identifier,
   String? label,
   AttributedString? attributedLabel,
   String? hint,
@@ -670,6 +696,7 @@ Matcher matchesSemantics({
   bool isExpanded = false,
   // Actions //
   bool hasTapAction = false,
+  bool hasFocusAction = false,
   bool hasLongPressAction = false,
   bool hasScrollLeftAction = false,
   bool hasScrollRightAction = false,
@@ -697,6 +724,7 @@ Matcher matchesSemantics({
   List<Matcher>? children,
 }) {
   return _MatchesSemanticsData(
+    identifier: identifier,
     label: label,
     attributedLabel: attributedLabel,
     hint: hint,
@@ -748,6 +776,7 @@ Matcher matchesSemantics({
     isExpanded: isExpanded,
     // Actions
     hasTapAction: hasTapAction,
+    hasFocusAction: hasFocusAction,
     hasLongPressAction: hasLongPressAction,
     hasScrollLeftAction: hasScrollLeftAction,
     hasScrollRightAction: hasScrollRightAction,
@@ -780,7 +809,11 @@ Matcher matchesSemantics({
 /// There are no default expected values, so no unspecified values will be
 /// validated.
 ///
-/// To retrieve the semantics data of a widget, use [WidgetTester.getSemantics]
+/// To find a [SemanticsNode] directly, use [CommonFinders.semantics].
+/// These methods will search the semantics tree directly and avoid the edge
+/// cases that [SemanticsController.find] sometimes runs into.
+///
+/// To retrieve the semantics data of a widget, use [SemanticsController.find]
 /// with a [Finder] that returns a single widget. Semantics must be enabled
 /// in order to use this method.
 ///
@@ -800,6 +833,7 @@ Matcher matchesSemantics({
 ///   * [SemanticsController.find] under [WidgetTester.semantics], the tester method which retrieves semantics.
 ///   * [matchesSemantics], a similar matcher with default values for flags and actions.
 Matcher containsSemantics({
+  String? identifier,
   String? label,
   AttributedString? attributedLabel,
   String? hint,
@@ -850,6 +884,7 @@ Matcher containsSemantics({
   bool? isExpanded,
   // Actions
   bool? hasTapAction,
+  bool? hasFocusAction,
   bool? hasLongPressAction,
   bool? hasScrollLeftAction,
   bool? hasScrollRightAction,
@@ -877,6 +912,7 @@ Matcher containsSemantics({
   List<Matcher>? children,
 }) {
   return _MatchesSemanticsData(
+    identifier: identifier,
     label: label,
     attributedLabel: attributedLabel,
     hint: hint,
@@ -928,6 +964,7 @@ Matcher containsSemantics({
     isExpanded: isExpanded,
     // Actions
     hasTapAction: hasTapAction,
+    hasFocusAction: hasFocusAction,
     hasLongPressAction: hasLongPressAction,
     hasScrollLeftAction: hasScrollLeftAction,
     hasScrollRightAction: hasScrollRightAction,
@@ -1178,19 +1215,24 @@ class _HasOneLineDescription extends Matcher {
 }
 
 class _EqualsIgnoringHashCodes extends Matcher {
-  _EqualsIgnoringHashCodes(Object v) : _value = _normalize(v);
+  _EqualsIgnoringHashCodes(Object v)
+      : _value = _normalize(v),
+        _stringValue = v is String ? _normalizeString(v) : null;
 
-  final Object _value;
+  final Iterable<String> _value;
+  final String? _stringValue;
 
-  static final Object _mismatchedValueKey = Object();
+  static final Object _lineNumberValueKey = Object();
+  static final Object _expectedLineValueKey = Object();
+  static final Object _seenLineValueKey = Object();
 
   static String _normalizeString(String value) {
     return value.replaceAll(RegExp(r'#[\da-fA-F]{5}'), '#00000');
   }
 
-  static Object _normalize(Object value, {bool expected = true}) {
+  static Iterable<String> _normalize(Object value, {bool expected = true}) {
     if (value is String) {
-      return _normalizeString(value);
+      return LineSplitter.split(value).map<String>((dynamic item) => _normalizeString(item.toString()));
     }
     if (value is Iterable<String>) {
       return value.map<String>((dynamic item) => _normalizeString(item.toString()));
@@ -1202,20 +1244,33 @@ class _EqualsIgnoringHashCodes extends Matcher {
 
   @override
   bool matches(dynamic object, Map<dynamic, dynamic> matchState) {
-    final Object normalized = _normalize(object as Object, expected: false);
-    if (!equals(_value).matches(normalized, matchState)) {
-      matchState[_mismatchedValueKey] = normalized;
-      return false;
+    final Iterable<String> normalized = _normalize(object as Object, expected: false);
+    final Iterator<String> expectedIt = _value.iterator;
+    final Iterator<String> seenIt = normalized.iterator;
+
+    int lineNumber = 1;
+
+    bool hasExpected = expectedIt.moveNext();
+    bool hasSeen = seenIt.moveNext();
+    while (hasExpected && hasSeen) {
+      if (!equals(expectedIt.current).matches(seenIt.current, matchState)) {
+        matchState[_lineNumberValueKey] = lineNumber;
+        matchState[_expectedLineValueKey] = expectedIt.current;
+        matchState[_seenLineValueKey] = seenIt.current;
+        return false;
+      }
+
+      lineNumber += 1;
+      hasExpected = expectedIt.moveNext();
+      hasSeen = seenIt.moveNext();
     }
-    return true;
+
+    return !hasExpected && !hasSeen;
   }
 
   @override
   Description describe(Description description) {
-    if (_value is String) {
-      return description.add('normalized value matches $_value');
-    }
-    return description.add('normalized value matches\n').addDescriptionOf(_value);
+    return description.add('normalized value matches\n').addDescriptionOf(_stringValue ?? _value);
   }
 
   @override
@@ -1225,16 +1280,17 @@ class _EqualsIgnoringHashCodes extends Matcher {
     Map<dynamic, dynamic> matchState,
     bool verbose,
   ) {
-    if (matchState.containsKey(_mismatchedValueKey)) {
-      final Object actualValue = matchState[_mismatchedValueKey] as Object;
-      // Leading whitespace is added so that lines in the multiline
-      // description returned by addDescriptionOf are all indented equally
-      // which makes the output easier to read for this case.
-      return mismatchDescription
-          .add('was expected to be normalized value\n')
-          .addDescriptionOf(_value)
+    if (matchState.containsKey(_lineNumberValueKey) &&
+        matchState.containsKey(_expectedLineValueKey) &&
+        matchState.containsKey(_seenLineValueKey)) {
+      final int lineNumber = matchState[_lineNumberValueKey] as int;
+      if (lineNumber > 1) {
+        mismatchDescription = mismatchDescription
+          .add('Lines $lineNumber differed, expected: \n')
+          .addDescriptionOf(matchState[_expectedLineValueKey])
           .add('\nbut got\n')
-          .addDescriptionOf(actualValue);
+          .addDescriptionOf(matchState[_seenLineValueKey]);
+      }
     }
     return mismatchDescription;
   }
@@ -1469,8 +1525,6 @@ double _matrix3Distance(Matrix3 a, Matrix3 b) {
 }
 
 double _sizeDistance(Size a, Size b) {
-  // TODO(a14n): remove ignore when lint is updated, https://github.com/dart-lang/linter/issues/1843
-  // ignore: unnecessary_parenthesis
   final Offset delta = (b - a) as Offset;
   return delta.distance;
 }
@@ -2100,23 +2154,59 @@ class _CoversSameAreaAs extends Matcher {
     description.add('covers expected area and only expected area');
 }
 
-class _ColorMatcher extends Matcher {
-  const _ColorMatcher({
-    required this.targetColor,
-  });
+class _ColorSwatchMatcher<T> extends Matcher {
+  _ColorSwatchMatcher(this._target, this._threshold);
 
-  final Color targetColor;
+  final ColorSwatch<T> _target;
+  final double _threshold;
 
   @override
-  bool matches(dynamic item, Map<dynamic, dynamic> matchState) {
-    if (item is Color) {
-      return item == targetColor || item.value == targetColor.value;
-    }
-    return false;
+  Description describe(Description description) {
+    return description.add('matches color swatch "$_target" with threshold "$_threshold".');
   }
 
   @override
-  Description describe(Description description) => description.add('matches color $targetColor');
+  bool matches(dynamic item, Map<dynamic, dynamic> matchState) {
+    if (item is ColorSwatch) {
+      final _ColorMatcher matcher = _ColorMatcher(_target, _threshold);
+      if (!matcher.matches(item, matchState)) {
+        return false;
+      }
+
+      for (final T key in _target.keys) {
+        final _ColorMatcher matcher = _ColorMatcher(_target[key]!, _threshold);
+        if (!matcher.matches(item[key], matchState)) {
+          return false;
+        }
+      }
+
+      return item.keys.length == _target.keys.length;
+    } else {
+      return false;
+    }
+  }
+}
+
+class _ColorMatcher extends Matcher {
+  _ColorMatcher(this._target, this._threshold);
+
+  final ui.Color _target;
+  final double _threshold;
+
+  @override
+  Description describe(Description description) {
+    return description.add('matches color "$_target" with threshold "$_threshold".');
+  }
+
+  @override
+  bool matches(dynamic item, Map<dynamic, dynamic> matchState) {
+    return item is ui.Color &&
+        item.colorSpace == _target.colorSpace &&
+        (item.a - _target.a).abs() <= _threshold &&
+        (item.r - _target.r).abs() <= _threshold &&
+        (item.g - _target.g).abs() <= _threshold &&
+        (item.b - _target.b).abs() <= _threshold;
+  }
 }
 
 int _countDifferentPixels(Uint8List imageA, Uint8List imageB) {
@@ -2199,6 +2289,7 @@ class _MatchesReferenceImage extends AsyncMatcher {
 
 class _MatchesSemanticsData extends Matcher {
   _MatchesSemanticsData({
+    required this.identifier,
     required this.label,
     required this.attributedLabel,
     required this.hint,
@@ -2249,6 +2340,7 @@ class _MatchesSemanticsData extends Matcher {
     required bool? isExpanded,
     // Actions
     required bool? hasTapAction,
+    required bool? hasFocusAction,
     required bool? hasLongPressAction,
     required bool? hasScrollLeftAction,
     required bool? hasScrollRightAction,
@@ -2307,6 +2399,7 @@ class _MatchesSemanticsData extends Matcher {
         },
         actions = <SemanticsAction, bool>{
           if (hasTapAction != null) SemanticsAction.tap: hasTapAction,
+          if (hasFocusAction != null) SemanticsAction.focus: hasFocusAction,
           if (hasLongPressAction != null) SemanticsAction.longPress: hasLongPressAction,
           if (hasScrollLeftAction != null) SemanticsAction.scrollLeft: hasScrollLeftAction,
           if (hasScrollRightAction != null) SemanticsAction.scrollRight: hasScrollRightAction,
@@ -2336,6 +2429,7 @@ class _MatchesSemanticsData extends Matcher {
                 onLongPressHint: onLongPressHint,
               );
 
+  final String? identifier;
   final String? label;
   final AttributedString? attributedLabel;
   final String? hint;
@@ -2368,8 +2462,8 @@ class _MatchesSemanticsData extends Matcher {
   final Map<SemanticsFlag, bool> flags;
 
   @override
-  Description describe(Description description) {
-    description.add('has semantics');
+  Description describe(Description description, [String? index]) {
+    description.add('${index == null ? '' : 'Child $index '}has semantics');
     if (label != null) {
       description.add(' with label: $label');
     }
@@ -2468,9 +2562,15 @@ class _MatchesSemanticsData extends Matcher {
       description.add(' with custom hints: $hintOverrides');
     }
     if (children != null) {
-      description.add(' with children:\n');
-      for (final _MatchesSemanticsData child in children!.cast<_MatchesSemanticsData>()) {
-        child.describe(description);
+      description.add(' with children:\n  ');
+      final List<_MatchesSemanticsData> childMatches = children!.cast<_MatchesSemanticsData>();
+      int childIndex = 1;
+      for (final _MatchesSemanticsData child in childMatches) {
+        child.describe(description, index != null ? '$index:$childIndex': '$childIndex');
+        if (child != childMatches.last) {
+          description.add('\n  ');
+        }
+        childIndex += 1;
       }
     }
     return description;
@@ -2502,7 +2602,13 @@ class _MatchesSemanticsData extends Matcher {
       return failWithDescription(matchState, 'No SemanticsData provided. '
         'Maybe you forgot to enable semantics?');
     }
-    final SemanticsData data = node is SemanticsNode ? node.getSemanticsData() : (node as SemanticsData);
+
+    final SemanticsData data = switch (node) {
+      SemanticsNode() => node.getSemanticsData(),
+      FinderBase<SemanticsNode>() => node.evaluate().single.getSemanticsData(),
+      _ => node as SemanticsData,
+    };
+
     if (label != null && label != data.label) {
       return failWithDescription(matchState, 'label was: ${data.label}');
     }

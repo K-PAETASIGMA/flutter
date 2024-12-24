@@ -16,7 +16,9 @@ import 'package:flutter_tools/src/base/process.dart';
 import 'package:flutter_tools/src/base/signals.dart';
 import 'package:flutter_tools/src/base/template.dart';
 import 'package:flutter_tools/src/base/terminal.dart';
+import 'package:flutter_tools/src/base/time.dart';
 import 'package:flutter_tools/src/base/version.dart';
+import 'package:flutter_tools/src/build_system/build_targets.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/context_runner.dart';
 import 'package:flutter_tools/src/dart/pub.dart';
@@ -27,6 +29,7 @@ import 'package:flutter_tools/src/globals.dart' as globals;
 import 'package:flutter_tools/src/ios/plist_parser.dart';
 import 'package:flutter_tools/src/ios/simulators.dart';
 import 'package:flutter_tools/src/ios/xcodeproj.dart';
+import 'package:flutter_tools/src/isolated/build_targets.dart';
 import 'package:flutter_tools/src/isolated/mustache_template.dart';
 import 'package:flutter_tools/src/persistent_tool_state.dart';
 import 'package:flutter_tools/src/project.dart';
@@ -121,12 +124,21 @@ void testUsingContext(
           Pub: () => ThrowingPub(), // prevent accidentally using pub.
           CrashReporter: () => const NoopCrashReporter(),
           TemplateRenderer: () => const MustacheTemplateRenderer(),
-          Analytics: () => NoOpAnalytics(),
+          BuildTargets: () => const BuildTargetsImpl(),
+          Analytics: () => const NoOpAnalytics(),
+          Stdio: () => FakeStdio(),
         },
         body: () {
-          return runZonedGuarded<Future<dynamic>>(() {
+          // To catch all errors thrown by the test, even uncaught async errors, we use a zone.
+          //
+          // Zones introduce their own event loop, so we do not await futures created inside
+          // the zone from outside the zone. Instead, we create a Completer outside the zone,
+          // and have the test complete it when the test ends (in success or failure), and we
+          // await that.
+          final Completer<void> completer = Completer<void>();
+          runZonedGuarded<Future<dynamic>>(() async {
             try {
-              return context.run<dynamic>(
+              return await context.run<dynamic>(
                 // Apply the overrides to the test context in the zone since their
                 // instantiation may reference items already stored on the context.
                 overrides: overrides,
@@ -140,18 +152,26 @@ void testUsingContext(
                   return await testMethod();
                 },
               );
-            // This catch rethrows, so doesn't need to catch only Exception.
-            } catch (error) { // ignore: avoid_catches_without_on_clauses
-              _printBufferedErrors(context);
-              rethrow;
+            } finally {
+              // We do not need a catch { ... } block because the error zone
+              // will catch all errors and send them to the completer below.
+              //
+              // See https://github.com/flutter/flutter/pull/141821/files#r1462288131.
+              if (!completer.isCompleted) {
+                completer.complete();
+              }
             }
           }, (Object error, StackTrace stackTrace) {
             // When things fail, it's ok to print to the console!
             print(error); // ignore: avoid_print
             print(stackTrace); // ignore: avoid_print
             _printBufferedErrors(context);
+            if (!completer.isCompleted) {
+              completer.completeError(error, stackTrace);
+            }
             throw error; //ignore: only_throw_errors
           });
+          return completer.future;
         },
       );
     }, overrides: <Type, Generator>{
@@ -271,13 +291,11 @@ class FakeDeviceManager implements DeviceManager {
   Device? getSingleEphemeralDevice(List<Device> devices) => null;
 
   List<Device> filteredDevices(DeviceDiscoveryFilter? filter) {
-    if (filter?.deviceConnectionInterface == DeviceConnectionInterface.attached) {
-      return attachedDevices;
-    }
-    if (filter?.deviceConnectionInterface == DeviceConnectionInterface.wireless) {
-      return wirelessDevices;
-    }
-    return attachedDevices + wirelessDevices;
+    return switch (filter?.deviceConnectionInterface) {
+      DeviceConnectionInterface.attached => attachedDevices,
+      DeviceConnectionInterface.wireless => wirelessDevices,
+      null => attachedDevices + wirelessDevices,
+    };
   }
 }
 
@@ -291,7 +309,8 @@ class FakeAndroidLicenseValidator extends Fake implements AndroidLicenseValidato
 }
 
 class FakeDoctor extends Doctor {
-  FakeDoctor(Logger logger) : super(logger: logger);
+  FakeDoctor(Logger logger, {super.clock = const SystemClock()})
+      : super(logger: logger);
 
   // True for testing.
   @override
@@ -373,7 +392,7 @@ class FakeXcodeProjectInterpreter implements XcodeProjectInterpreter {
   List<String> xcrunCommand() => <String>['xcrun'];
 }
 
-/// Prevent test crashest from being reported to the crash backend.
+/// Prevent test crashes from being reported to the crash backend.
 class NoopCrashReporter implements CrashReporter {
   const NoopCrashReporter();
 
@@ -382,9 +401,9 @@ class NoopCrashReporter implements CrashReporter {
 }
 
 class LocalFileSystemBlockingSetCurrentDirectory extends LocalFileSystem {
-  LocalFileSystemBlockingSetCurrentDirectory() : super.test(
-    signals: LocalSignals.instance,
-  );
+  // Use [FakeSignals] so developers running the test suite can kill the test
+  // runner.
+  LocalFileSystemBlockingSetCurrentDirectory() : super.test(signals: FakeSignals());
 
   @override
   set currentDirectory(dynamic value) {

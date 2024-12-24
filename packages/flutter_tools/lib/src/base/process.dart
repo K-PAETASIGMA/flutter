@@ -25,12 +25,10 @@ typedef ShutdownHook = FutureOr<void> Function();
 // for more details.
 
 abstract class ShutdownHooks {
-  factory ShutdownHooks() => _DefaultShutdownHooks();
+  factory ShutdownHooks() = _DefaultShutdownHooks;
 
   /// Registers a [ShutdownHook] to be executed before the VM exits.
-  void addShutdownHook(
-    ShutdownHook shutdownHook
-  );
+  void addShutdownHook(ShutdownHook shutdownHook);
 
   @visibleForTesting
   List<ShutdownHook> get registeredHooks;
@@ -71,13 +69,10 @@ class _DefaultShutdownHooks implements ShutdownHooks {
     );
     _shutdownHooksRunning = true;
     try {
-      final List<Future<dynamic>> futures = <Future<dynamic>>[];
-      for (final ShutdownHook shutdownHook in registeredHooks) {
-        final FutureOr<dynamic> result = shutdownHook();
-        if (result is Future<dynamic>) {
-          futures.add(result);
-        }
-      }
+      final List<Future<dynamic>> futures = <Future<dynamic>>[
+        for (final ShutdownHook shutdownHook in registeredHooks)
+          if (shutdownHook() case final Future<dynamic> result) result,
+      ];
       await Future.wait<dynamic>(futures);
     } finally {
       _shutdownHooksRunning = false;
@@ -139,10 +134,7 @@ abstract class ProcessUtils {
   factory ProcessUtils({
     required ProcessManager processManager,
     required Logger logger,
-  }) => _DefaultProcessUtils(
-    processManager: processManager,
-    logger: logger,
-  );
+  }) = _DefaultProcessUtils;
 
   /// Spawns a child process to run the command [cmd].
   ///
@@ -233,6 +225,123 @@ abstract class ProcessUtils {
     List<String> cli, {
     Map<String, String>? environment,
   });
+
+  /// Write [line] to [stdin] and catch any errors with [onError].
+  ///
+  /// Specifically with [Process] file descriptors, an exception that is
+  /// thrown as part of a write can be most reliably caught with a
+  /// [ZoneSpecification] error handler.
+  ///
+  /// On some platforms, the following code appears to work:
+  ///
+  /// ```dart
+  /// stdin.writeln(line);
+  /// try {
+  ///   await stdin.flush(line);
+  /// } catch (err) {
+  ///   // handle error
+  /// }
+  /// ```
+  ///
+  /// However it did not catch a [SocketException] on Linux.
+  ///
+  /// As part of making sure errors are caught, this function will call [flush]
+  /// on [stdin] to ensure that [line] is written to the pipe before this
+  /// function returns. This means completion will be blocked if the kernel
+  /// buffer of the pipe is full.
+  static Future<void> writelnToStdinGuarded({
+    required IOSink stdin,
+    required String line,
+    required void Function(Object, StackTrace) onError,
+  }) async {
+    await _writeToStdinGuarded(
+      stdin: stdin,
+      content: line,
+      onError: onError,
+      isLine: true,
+    );
+  }
+
+  /// Please see [writelnToStdinGuarded].
+  ///
+  /// This calls `stdin.write` instead of `stdin.writeln`.
+  static Future<void> writeToStdinGuarded({
+    required IOSink stdin,
+    required String content,
+    required void Function(Object, StackTrace) onError,
+  }) async {
+    await _writeToStdinGuarded(
+      stdin: stdin,
+      content: content,
+      onError: onError,
+      isLine: false,
+    );
+  }
+
+  static Future<void> writelnToStdinUnsafe({
+    required IOSink stdin,
+    required String line,
+  }) async {
+    await _writeToStdinUnsafe(
+      stdin: stdin,
+      content: line,
+      isLine: true,
+    );
+  }
+
+  static Future<void> writeToStdinUnsafe({
+    required IOSink stdin,
+    required String content,
+  }) async {
+    await _writeToStdinUnsafe(
+      stdin: stdin,
+      content: content,
+      isLine: false,
+    );
+  }
+
+  static Future<void> _writeToStdinGuarded({
+    required IOSink stdin,
+    required String content,
+    required void Function(Object, StackTrace) onError,
+    required bool isLine,
+  }) async {
+    try {
+      await _writeToStdinUnsafe(stdin: stdin, content: content, isLine: isLine);
+    } on Exception catch (error, stackTrace) {
+      onError(error, stackTrace);
+    }
+  }
+
+  static Future<void> _writeToStdinUnsafe({
+    required IOSink stdin,
+    required String content,
+    required bool isLine,
+  }) {
+    final Completer<void> completer = Completer<void>();
+
+    void handleError(Object error, StackTrace stackTrace) {
+      completer.completeError(error, stackTrace);
+    }
+
+    void writeFlushAndComplete() {
+      if (isLine) {
+        stdin.writeln(content);
+      } else {
+        stdin.write(content);
+      }
+      stdin.flush().then(
+        (_) {
+          completer.complete();
+        },
+        onError: handleError,
+      );
+    }
+
+    runZonedGuarded(writeFlushAndComplete, handleError);
+
+    return completer.future;
+  }
 }
 
 class _DefaultProcessUtils implements ProcessUtils {
@@ -277,7 +386,7 @@ class _DefaultProcessUtils implements ProcessUtils {
       _logger.printTrace(runResult.toString());
       if (throwOnError && runResult.exitCode != 0 &&
           (allowedFailures == null || !allowedFailures(runResult.exitCode))) {
-        runResult.throwException('Process exited abnormally:\n$runResult');
+        runResult.throwException('Process exited abnormally with exit code ${runResult.exitCode}:\n$runResult');
       }
       return runResult;
     }
@@ -341,7 +450,7 @@ class _DefaultProcessUtils implements ProcessUtils {
         _logger.printTrace(runResult.toString());
         if (throwOnError && runResult.exitCode != 0 &&
             (allowedFailures == null || !allowedFailures(exitCode))) {
-          runResult.throwException('Process exited abnormally:\n$runResult');
+          runResult.throwException('Process exited abnormally with exit code $exitCode:\n$runResult');
         }
         return runResult;
       }
@@ -407,7 +516,7 @@ class _DefaultProcessUtils implements ProcessUtils {
     }
 
     if (failedExitCode && throwOnError) {
-      String message = 'The command failed';
+      String message = 'The command failed with exit code ${runResult.exitCode}';
       if (verboseExceptions) {
         message = 'The command failed\nStdout:\n${runResult.stdout}\n'
             'Stderr:\n${runResult.stderr}';
@@ -577,7 +686,9 @@ Future<int> exitWithHooks(int code, {required ShutdownHooks shutdownHooks}) asyn
       messenger.shouldDisplayLicenseTerms();
 
   // Prints the welcome message if needed for legacy analytics.
-  globals.flutterUsage.printWelcome();
+  if (!(await globals.isRunningOnBot)) {
+    globals.flutterUsage.printWelcome();
+  }
 
   // Ensure that the consent message has been displayed for unified analytics
   if (globals.analytics.shouldShowMessage) {
@@ -622,6 +733,12 @@ Future<int> exitWithHooks(int code, {required ShutdownHooks shutdownHooks}) asyn
   await shutdownHooks.runShutdownHooks(globals.logger);
 
   final Completer<void> completer = Completer<void>();
+
+  // Allow any pending analytics events to send and close the http connection
+  //
+  // By default, we will wait 250 ms before canceling any pending events, we
+  // can change the [delayDuration] in the close method if it needs to be changed
+  await globals.analytics.close();
 
   // Give the task / timer queue one cycle through before we hard exit.
   Timer.run(() {

@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'scroll_view.dart';
+/// @docImport 'sliver.dart';
+library;
+
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
@@ -397,6 +401,9 @@ class _TableElement extends RenderObjectElement {
 /// the [TableCell] widget to its enclosing [Table] must contain only
 /// [TableRow]s, [StatelessWidget]s, or [StatefulWidget]s (not
 /// other kinds of widgets, like [RenderObjectWidget]s).
+///
+/// To create an empty [TableCell], provide a [SizedBox.shrink]
+/// as the [child].
 class TableCell extends ParentDataWidget<TableCellParentData> {
   /// Creates a widget that controls how a child of a [Table] is aligned.
   const TableCell({
@@ -413,10 +420,7 @@ class TableCell extends ParentDataWidget<TableCellParentData> {
     final TableCellParentData parentData = renderObject.parentData! as TableCellParentData;
     if (parentData.verticalAlignment != verticalAlignment) {
       parentData.verticalAlignment = verticalAlignment;
-      final RenderObject? targetParent = renderObject.parent;
-      if (targetParent is RenderObject) {
-        targetParent.markNeedsLayout();
-      }
+      renderObject.parent?.markNeedsLayout();
     }
   }
 

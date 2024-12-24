@@ -11,7 +11,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/gestures.dart' show kPrimaryButton;
+import 'package:flutter/gestures.dart' show PointerDeviceKind, kPrimaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -92,15 +92,10 @@ Future<void> main() async {
 }
 
 final Finder backFinder = find.byElementPredicate(
-  (Element element) {
-    final Widget widget = element.widget;
-    if (widget is Tooltip) {
-      return widget.message == 'Back';
-    }
-    if (widget is CupertinoNavigationBarBackButton) {
-      return true;
-    }
-    return false;
+  (Element element) => switch (element.widget) {
+    Tooltip(message: 'Back') => true,
+    CupertinoNavigationBarBackButton() => true,
+    _ => false,
   },
   description: 'Material or Cupertino back button',
 );
@@ -137,13 +132,18 @@ class _LiveWidgetController extends LiveWidgetController {
     return finder;
   }
 
-  @override
-  Future<void> tap(FinderBase<Element> finder, { int? pointer, int buttons = kPrimaryButton, bool warnIfMissed = true }) async {
-    await super.tap(await _waitForElement(finder), pointer: pointer, buttons: buttons, warnIfMissed: warnIfMissed);
-  }
-
   Future<void> scrollIntoView(FinderBase<Element> finder, {required double alignment}) async {
     final FinderBase<Element> target = await _waitForElement(finder);
     await Scrollable.ensureVisible(target.evaluate().single, duration: const Duration(milliseconds: 100), alignment: alignment);
+  }
+
+  @override
+  Future<void> tap(FinderBase<Element> finder, {
+    int? pointer,
+    int buttons = kPrimaryButton,
+    bool warnIfMissed = true,
+    PointerDeviceKind kind = PointerDeviceKind.touch,
+  }) async {
+    await super.tap(await _waitForElement(finder), pointer: pointer, buttons: buttons, warnIfMissed: warnIfMissed, kind: kind);
   }
 }

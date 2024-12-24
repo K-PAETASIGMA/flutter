@@ -2,6 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/cupertino.dart';
+/// @docImport 'package:flutter/material.dart';
+/// @docImport 'package:flutter/semantics.dart';
+///
+/// @docImport 'actions.dart';
+/// @docImport 'container.dart';
+/// @docImport 'editable_text.dart';
+/// @docImport 'focus_traversal.dart';
+/// @docImport 'overlay.dart';
+library;
+
 import 'package:flutter/foundation.dart';
 
 import 'basic.dart';
@@ -119,6 +130,10 @@ class Focus extends StatefulWidget {
     this.autofocus = false,
     this.onFocusChange,
     FocusOnKeyEventCallback? onKeyEvent,
+    @Deprecated(
+      'Use onKeyEvent instead. '
+      'This feature was deprecated after v3.18.0-2.0.pre.',
+    )
     FocusOnKeyCallback? onKey,
     bool? canRequestFocus,
     bool? skipTraversal,
@@ -228,8 +243,7 @@ class Focus extends StatefulWidget {
   /// A handler for keys that are pressed when this object or one of its
   /// children has focus.
   ///
-  /// This is a legacy API based on [RawKeyEvent] and will be deprecated in the
-  /// future. Prefer [onKeyEvent] instead.
+  /// This property is deprecated and will be removed. Use [onKeyEvent] instead.
   ///
   /// Key events are first given to the [FocusNode] that has primary focus, and
   /// if its [onKey] method return false, then they are given to each ancestor
@@ -241,6 +255,10 @@ class Focus extends StatefulWidget {
   /// keyboards in general. For text input, consider [TextField],
   /// [EditableText], or [CupertinoTextField] instead, which do support these
   /// things.
+  @Deprecated(
+    'Use onKeyEvent instead. '
+    'This feature was deprecated after v3.18.0-2.0.pre.',
+  )
   FocusOnKeyCallback? get onKey => _onKey ?? focusNode?.onKey;
   final FocusOnKeyCallback? _onKey;
 
@@ -426,20 +444,15 @@ class Focus extends StatefulWidget {
   /// * [of], which is similar to this function, but will throw an exception if
   ///   it doesn't find a [Focus] node, instead of returning null.
   static FocusNode? maybeOf(BuildContext context, { bool scopeOk = false, bool createDependency = true }) {
-    final _FocusInheritedScope? scope;
-    if (createDependency) {
-      scope = context.dependOnInheritedWidgetOfExactType<_FocusInheritedScope>();
-    } else {
-      scope = context.getInheritedWidgetOfExactType<_FocusInheritedScope>();
-    }
-    final FocusNode? node = scope?.notifier;
-    if (node == null) {
-      return null;
-    }
-    if (!scopeOk && node is FocusScopeNode) {
-      return null;
-    }
-    return node;
+    final _FocusInheritedScope? scope = createDependency
+        ? context.dependOnInheritedWidgetOfExactType<_FocusInheritedScope>()
+        : context.getInheritedWidgetOfExactType<_FocusInheritedScope>();
+
+    return switch (scope?.notifier) {
+      null => null,
+      FocusScopeNode() when !scopeOk => null,
+      final FocusNode node => node,
+    };
   }
 
   /// Returns true if the nearest enclosing [Focus] widget's node is focused.
@@ -504,7 +517,7 @@ class _FocusWithExternalFocusNode extends Focus {
 
 class _FocusState extends State<Focus> {
   FocusNode? _internalNode;
-  FocusNode get focusNode => widget.focusNode ?? _internalNode!;
+  FocusNode get focusNode => widget.focusNode ?? (_internalNode ??= _createNode());
   late bool _hadPrimaryFocus;
   late bool _couldRequestFocus;
   late bool _descendantsWereFocusable;
@@ -519,17 +532,13 @@ class _FocusState extends State<Focus> {
   }
 
   void _initNode() {
-    if (widget.focusNode == null) {
-      // Only create a new node if the widget doesn't have one.
-      // This calls a function instead of just allocating in place because
-      // _createNode is overridden in _FocusScopeState.
-      _internalNode ??= _createNode();
-    }
-    focusNode.descendantsAreFocusable = widget.descendantsAreFocusable;
-    focusNode.descendantsAreTraversable = widget.descendantsAreTraversable;
-    focusNode.skipTraversal = widget.skipTraversal;
-    if (widget._canRequestFocus != null) {
-      focusNode.canRequestFocus = widget._canRequestFocus!;
+    if (!widget._usingExternalFocus) {
+      focusNode.descendantsAreFocusable = widget.descendantsAreFocusable;
+      focusNode.descendantsAreTraversable = widget.descendantsAreTraversable;
+      focusNode.skipTraversal = widget.skipTraversal;
+      if (widget._canRequestFocus != null) {
+        focusNode.canRequestFocus = widget._canRequestFocus!;
+      }
     }
     _couldRequestFocus = focusNode.canRequestFocus;
     _descendantsWereFocusable = focusNode.descendantsAreFocusable;
@@ -668,6 +677,15 @@ class _FocusState extends State<Focus> {
     Widget child = widget.child;
     if (widget.includeSemantics) {
       child = Semantics(
+        // Automatically request the focus for a focusable widget when it
+        // receives an input focus action from the semantics. Nothing is needed
+        // for losing the focus because if focus is lost, that means another
+        // node will gain focus and take focus from this widget.
+        // TODO(gspencergoog): Allow this to be set on iOS once the issue is
+        // addressed: https://github.com/flutter/flutter/issues/150030
+        onFocus: defaultTargetPlatform != TargetPlatform.iOS && _couldRequestFocus
+          ? focusNode.requestFocus
+          : null,
         focusable: _couldRequestFocus,
         focused: _hadPrimaryFocus,
         child: widget.child,
@@ -754,6 +772,9 @@ class FocusScope extends Focus {
     super.onKeyEvent,
     super.onKey,
     super.debugLabel,
+    super.includeSemantics,
+    super.descendantsAreFocusable,
+    super.descendantsAreTraversable,
   })  : super(
           focusNode: node,
         );
@@ -767,6 +788,7 @@ class FocusScope extends Focus {
     required FocusScopeNode focusScopeNode,
     FocusNode? parentNode,
     bool autofocus,
+    bool includeSemantics,
     ValueChanged<bool>? onFocusChange,
   })  = _FocusScopeWithExternalFocusNode;
 
@@ -795,6 +817,7 @@ class _FocusScopeWithExternalFocusNode extends FocusScope {
     required FocusScopeNode focusScopeNode,
     super.parentNode,
     super.autofocus,
+    super.includeSemantics,
     super.onFocusChange,
   }) : super(
     node: focusScopeNode,
@@ -831,13 +854,17 @@ class _FocusScopeState extends _FocusState {
   @override
   Widget build(BuildContext context) {
     _focusAttachment!.reparent(parent: widget.parentNode);
-    return Semantics(
-      explicitChildNodes: true,
-      child: _FocusInheritedScope(
-        node: focusNode,
-        child: widget.child,
-      ),
+    Widget result = _FocusInheritedScope(
+      node: focusNode,
+      child: widget.child,
     );
+    if (widget.includeSemantics) {
+      result = Semantics(
+        explicitChildNodes: true,
+        child: result,
+      );
+    }
+    return result;
   }
 }
 

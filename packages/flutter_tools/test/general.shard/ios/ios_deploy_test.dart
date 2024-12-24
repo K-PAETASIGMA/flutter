@@ -9,12 +9,14 @@ import 'package:file/memory.dart';
 import 'package:file_testing/file_testing.dart';
 import 'package:flutter_tools/src/artifacts.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
+import 'package:flutter_tools/src/base/io.dart';
 import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/base/process.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/device.dart';
 import 'package:flutter_tools/src/ios/ios_deploy.dart';
+import 'package:test/fake.dart';
 
 import '../../src/common.dart';
 import '../../src/fake_process_manager.dart';
@@ -135,9 +137,8 @@ void main () {
           '',
           'Log after process stop',
         ]));
-        expect(stdin.stream.transform<String>(const Utf8Decoder()), emitsInOrder(<String>[
+        expect(_decodeLines(stdin.stream), emitsInOrder(<String>[
           'thread backtrace all',
-          '\n',
           'process detach',
         ]));
         expect(await iosDeployDebugger.launchAndAttach(), isTrue);
@@ -232,9 +233,8 @@ void main () {
           '* thread #1, stop reason = Assertion failed:',
         ]));
 
-        expect(stdin.stream.transform<String>(const Utf8Decoder()), emitsInOrder(<String>[
+        expect(_decodeLines(stdin.stream), emitsInOrder(<String>[
           'thread backtrace all',
-          '\n',
           'process detach',
         ]));
 
@@ -384,14 +384,33 @@ void main () {
       final IOSDeployDebugger iosDeployDebugger = IOSDeployDebugger.test(
         processManager: processManager,
       );
-      expect(stdin.stream.transform<String>(const Utf8Decoder()), emits('process detach'));
+      expect(_decodeLines(stdin.stream), emits('process detach'));
       await iosDeployDebugger.launchAndAttach();
-      iosDeployDebugger.detach();
+      await iosDeployDebugger.detach();
+    });
+
+    testWithoutContext('detach handles broken pipe', () async {
+      final StreamSink<List<int>> stdinSink = _ClosedStdinController();
+      final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
+        FakeCommand(
+          command: const <String>['ios-deploy'],
+          stdout: '(lldb)     run\nsuccess',
+          stdin: IOSink(stdinSink),
+        ),
+      ]);
+      final BufferLogger logger = BufferLogger.test();
+      final IOSDeployDebugger iosDeployDebugger = IOSDeployDebugger.test(
+        processManager: processManager,
+        logger: logger,
+      );
+      await iosDeployDebugger.launchAndAttach();
+      await iosDeployDebugger.detach();
+      expect(logger.traceText, contains('Could not detach from debugger'));
     });
 
     testWithoutContext('stop with backtrace', () async {
       final StreamController<List<int>> stdin = StreamController<List<int>>();
-      final Stream<String> stdinStream = stdin.stream.transform<String>(const Utf8Decoder());
+      final Stream<String> stdinStream = _decodeLines(stdin.stream);
       final FakeProcessManager processManager = FakeProcessManager.list(<FakeCommand>[
         FakeCommand(
           command: const <String>[
@@ -399,24 +418,32 @@ void main () {
           ],
           stdout:
           '(lldb)     run\nsuccess\nLog on attach\n(lldb) Process 6156 stopped\n* thread #1, stop reason = Assertion failed:\n(lldb) Process 6156 detached',
-          stdin: IOSink(stdin.sink),
+          stdin: IOSink(stdin),
         ),
       ]);
       final IOSDeployDebugger iosDeployDebugger = IOSDeployDebugger.test(
         processManager: processManager,
       );
       await iosDeployDebugger.launchAndAttach();
-      await iosDeployDebugger.stopAndDumpBacktrace();
-      expect(await stdinStream.take(3).toList(), <String>[
+      List<String>? stdinLines;
+
+      // These two futures will deadlock if await-ed sequentially
+      await Future.wait(<Future<void>>[
+        iosDeployDebugger.stopAndDumpBacktrace(),
+        stdinStream.take(3).toList().then<void>(
+          (List<String> lines) => stdinLines = lines,
+        ),
+      ]);
+      expect(stdinLines, const <String>[
         'thread backtrace all',
-        '\n',
         'process detach',
+        'process signal SIGSTOP',
       ]);
     });
 
     testWithoutContext('pause with backtrace', () async {
       final StreamController<List<int>> stdin = StreamController<List<int>>();
-      final Stream<String> stdinStream = stdin.stream.transform<String>(const Utf8Decoder());
+      final Stream<String> stdinStream = _decodeLines(stdin.stream);
       const String stdout = '''
 (lldb)     run
 success
@@ -472,9 +499,8 @@ process continue
           'frame #0: 0x0000000102eaee80 dyld`dyld3::MachOFile::read_uleb128(Diagnostics&, unsigned char const*&, unsigned char const*) + 36',
         ),
       );
-      expect(await stdinStream.take(3).toList(), <String>[
+      expect(await stdinStream.take(2).toList(), <String>[
         'thread backtrace all',
-        '\n',
         'process detach',
       ]);
     });
@@ -616,6 +642,11 @@ process continue
   });
 }
 
+class _ClosedStdinController extends Fake implements StreamSink<List<int>> {
+  @override
+  Future<Object?> addStream(Stream<List<int>> stream) async => throw const SocketException('Bad pipe');
+}
+
 IOSDeploy setUpIOSDeploy(ProcessManager processManager, {
     Artifacts? artifacts,
   }) {
@@ -675,3 +706,6 @@ class IOSDeployDebuggerWaitForExit extends IOSDeployDebugger {
     return status;
   }
 }
+
+Stream<String> _decodeLines(Stream<List<int>> bytes)
+    => bytes.transform(const Utf8Decoder()).transform(const LineSplitter());

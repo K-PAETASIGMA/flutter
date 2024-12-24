@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/widgets.dart';
+library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -148,7 +150,8 @@ class RenderAndroidView extends PlatformViewRenderBox {
   bool get isRepaintBoundary => true;
 
   @override
-  Size computeDryLayout(BoxConstraints constraints) {
+  @protected
+  Size computeDryLayout(covariant BoxConstraints constraints) {
     return constraints.biggest;
   }
 
@@ -201,7 +204,7 @@ class RenderAndroidView extends PlatformViewRenderBox {
         // Schedule a new post frame callback.
         _setOffset();
       }
-    });
+    }, debugLabel: 'RenderAndroidView.setOffset');
   }
 
   @override
@@ -319,7 +322,8 @@ abstract class RenderDarwinPlatformView<T extends DarwinPlatformViewController> 
   _UiKitViewGestureRecognizer? _gestureRecognizer;
 
   @override
-  Size computeDryLayout(BoxConstraints constraints) {
+  @protected
+  Size computeDryLayout(covariant BoxConstraints constraints) {
     return constraints.biggest;
   }
 
@@ -438,6 +442,12 @@ class RenderUiKitView extends RenderDarwinPlatformView<UiKitViewController> {
   void detach() {
     _gestureRecognizer!.reset();
     super.detach();
+  }
+
+  @override
+  void dispose() {
+    _gestureRecognizer?.dispose();
+    super.dispose();
   }
 }
 
@@ -711,7 +721,8 @@ class PlatformViewRenderBox extends RenderBox with _PlatformViewGestureMixin {
   bool get isRepaintBoundary => true;
 
   @override
-  Size computeDryLayout(BoxConstraints constraints) {
+  @protected
+  Size computeDryLayout(covariant BoxConstraints constraints) {
     return constraints.biggest;
   }
 
@@ -748,7 +759,7 @@ mixin _PlatformViewGestureMixin on RenderBox implements MouseTrackerAnnotation {
 
   _HandlePointerEvent? _handlePointerEvent;
 
-  /// {@macro flutter.rendering.RenderAndroidView.updateGestureRecognizers}
+  /// {@macro flutter.rendering.PlatformViewRenderBox.updateGestureRecognizers}
   ///
   /// Any active gesture arena the `PlatformView` participates in is rejected when the
   /// set of gesture recognizers is changed.
@@ -806,5 +817,11 @@ mixin _PlatformViewGestureMixin on RenderBox implements MouseTrackerAnnotation {
   void detach() {
     _gestureRecognizer!.reset();
     super.detach();
+  }
+
+  @override
+  void dispose() {
+    _gestureRecognizer?.dispose();
+    super.dispose();
   }
 }

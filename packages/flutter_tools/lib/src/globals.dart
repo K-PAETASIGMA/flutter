@@ -27,11 +27,11 @@ import 'base/terminal.dart';
 import 'base/time.dart';
 import 'base/user_messages.dart';
 import 'build_system/build_system.dart';
+import 'build_system/build_targets.dart';
 import 'cache.dart';
 import 'custom_devices/custom_devices_config.dart';
 import 'device.dart';
 import 'doctor.dart';
-import 'fuchsia/fuchsia_sdk.dart';
 import 'ios/ios_workflow.dart';
 import 'ios/plist_parser.dart';
 import 'ios/simulators.dart';
@@ -40,6 +40,7 @@ import 'macos/cocoapods.dart';
 import 'macos/cocoapods_validator.dart';
 import 'macos/xcdevice.dart';
 import 'macos/xcode.dart';
+import 'native_assets.dart';
 import 'persistent_tool_state.dart';
 import 'pre_run_validator.dart';
 import 'project.dart';
@@ -49,8 +50,12 @@ import 'runner/flutter_command.dart';
 import 'runner/local_engine.dart';
 import 'version.dart';
 
+// TODO(ianh): We should remove all the global variables and replace them with
+// arguments (to constructors, methods, etc, as appropriate).
+
 Artifacts? get artifacts => context.get<Artifacts>();
 BuildSystem get buildSystem => context.get<BuildSystem>()!;
+BuildTargets get buildTargets => context.get<BuildTargets>()!;
 Cache get cache => context.get<Cache>()!;
 CocoaPodsValidator? get cocoapodsValidator => context.get<CocoaPodsValidator>();
 Config get config => context.get<Config>()!;
@@ -65,8 +70,6 @@ Signals get signals => context.get<Signals>() ?? LocalSignals.instance;
 AndroidStudio? get androidStudio => context.get<AndroidStudio>();
 AndroidSdk? get androidSdk => context.get<AndroidSdk>();
 FlutterVersion get flutterVersion => context.get<FlutterVersion>()!;
-FuchsiaArtifacts? get fuchsiaArtifacts => context.get<FuchsiaArtifacts>();
-FuchsiaSdk? get fuchsiaSdk => context.get<FuchsiaSdk>();
 Usage get flutterUsage => context.get<Usage>()!;
 XcodeProjectInterpreter? get xcodeProjectInterpreter => context.get<XcodeProjectInterpreter>();
 XCDevice? get xcdevice => context.get<XCDevice>();
@@ -238,6 +241,7 @@ final AnsiTerminal _defaultAnsiTerminal = AnsiTerminal(
   stdio: stdio,
   platform: platform,
   now: DateTime.now(),
+  shutdownHooks: shutdownHooks,
 );
 
 /// The global Stdio wrapper.
@@ -299,3 +303,5 @@ NonNullSafeBuilds get nonNullSafeBuilds => context.get<NonNullSafeBuilds>() ?? N
 /// A value of [null] indicates that no installation of java could be found on
 /// the host machine.
 Java? get java => context.get<Java>();
+
+TestCompilerNativeAssetsBuilder? get nativeAssetsBuilder => context.get<TestCompilerNativeAssetsBuilder>();

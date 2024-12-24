@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:leak_tracker_flutter_testing/leak_tracker_flutter_testing.dart';
 
 import '../widgets/clipboard_utils.dart';
 import '../widgets/semantics_tester.dart';
@@ -26,7 +25,7 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
   });
 
-  testWidgetsWithLeakTracking('Changing query moves cursor to the end of query', (WidgetTester tester) async {
+  testWidgets('Changing query moves cursor to the end of query', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
     addTearDown(() => delegate.dispose());
 
@@ -50,6 +49,7 @@ void main() {
 
   testWidgets('Can open and close search', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
     final List<String> selectedResults = <String>[];
 
     await tester.pumpWidget(TestHomePage(
@@ -88,6 +88,7 @@ void main() {
     // regression test for https://github.com/flutter/flutter/issues/18145
 
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
     final List<String?> selectedResults = <String?>[];
 
     await tester.pumpWidget(TestHomePage(
@@ -133,6 +134,7 @@ void main() {
   testWidgets('Hint text color overridden', (WidgetTester tester) async {
     const String searchHintText = 'Enter search terms';
     final _TestSearchDelegate delegate = _TestSearchDelegate(searchHint: searchHintText);
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -146,6 +148,7 @@ void main() {
 
   testWidgets('Requests suggestions', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -175,6 +178,7 @@ void main() {
 
   testWidgets('Shows Results and closes search', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
     final List<String> selectedResults = <String>[];
 
     await tester.pumpWidget(TestHomePage(
@@ -211,6 +215,7 @@ void main() {
 
   testWidgets('Can switch between results and suggestions', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -281,6 +286,7 @@ void main() {
 
   testWidgets('Fresh search always starts with empty query', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -301,6 +307,7 @@ void main() {
 
   testWidgets('Initial queries are honored', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     expect(delegate.query, '');
 
@@ -317,6 +324,7 @@ void main() {
 
   testWidgets('Initial query null re-used previous query', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     delegate.query = 'Foo';
 
@@ -332,6 +340,7 @@ void main() {
 
   testWidgets('Changing query shows up in search field', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -353,6 +362,7 @@ void main() {
 
   testWidgets('transitionAnimation runs while search fades in/out', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -385,6 +395,7 @@ void main() {
       suggestions: 'Nested Suggestions',
       result: 'Nested Result',
     );
+    addTearDown(nestedSearchDelegate.dispose);
 
     final List<String> selectedResults = <String>[];
     final _TestSearchDelegate delegate = _TestSearchDelegate(
@@ -406,6 +417,7 @@ void main() {
         ),
       ],
     );
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -445,6 +457,7 @@ void main() {
 
   testWidgets('Closing search with nested search shown goes back to underlying route', (WidgetTester tester) async {
     late _TestSearchDelegate delegate;
+    addTearDown(() => delegate.dispose());
     final List<String?> nestedSearchResults = <String?>[];
     final _TestSearchDelegate nestedSearchDelegate = _TestSearchDelegate(
       suggestions: 'Nested Suggestions',
@@ -463,6 +476,7 @@ void main() {
         ),
       ],
     );
+    addTearDown(nestedSearchDelegate.dispose);
 
     final List<String> selectedResults = <String>[];
     delegate = _TestSearchDelegate(
@@ -520,6 +534,7 @@ void main() {
     final String defaultSearchHint = const DefaultMaterialLocalizations().searchFieldLabel;
 
     final _TestSearchDelegate delegate = _TestSearchDelegate(searchHint: searchHint);
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -535,6 +550,7 @@ void main() {
     final String searchHint = const DefaultMaterialLocalizations().searchFieldLabel;
 
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -550,6 +566,7 @@ void main() {
     const TextStyle searchFieldStyle = TextStyle(color: Colors.red, fontSize: 3);
 
     final _TestSearchDelegate delegate = _TestSearchDelegate(searchHint: searchHintText, searchFieldStyle: searchFieldStyle);
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(delegate: delegate));
     await tester.tap(find.byTooltip('Search'));
@@ -562,11 +579,52 @@ void main() {
     expect(hintText.style?.fontSize, delegate.searchFieldStyle?.fontSize);
     expect(textField.style?.color, delegate.searchFieldStyle?.color);
     expect(textField.style?.fontSize, delegate.searchFieldStyle?.fontSize);
-
   });
 
-  testWidgets('keyboard show search button by default', (WidgetTester tester) async {
+  testWidgets('Default autocorrect and enableSuggestions value', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
+
+    await tester.pumpWidget(TestHomePage(delegate: delegate));
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+
+    final TextField textField = tester.widget<TextField>(find.byType(TextField));
+
+    expect(textField.autocorrect, isTrue);
+    expect(textField.enableSuggestions, isTrue);
+  });
+
+  testWidgets('Custom autocorrect value', (WidgetTester tester) async {
+    final _TestSearchDelegate delegate = _TestSearchDelegate(autocorrect: false);
+    addTearDown(() => delegate.dispose());
+
+    await tester.pumpWidget(TestHomePage(delegate: delegate));
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+
+    final TextField textField = tester.widget<TextField>(find.byType(TextField));
+
+    expect(textField.autocorrect, isFalse);
+  });
+
+  testWidgets('Custom enableSuggestions value', (WidgetTester tester) async {
+    final _TestSearchDelegate delegate = _TestSearchDelegate(enableSuggestions: false);
+    addTearDown(() => delegate.dispose());
+
+    await tester.pumpWidget(TestHomePage(delegate: delegate));
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+
+    final TextField textField = tester.widget<TextField>(find.byType(TextField));
+
+    expect(textField.enableSuggestions, isFalse);
+  });
+
+  testWidgets('keyboard show search button by default',
+      (WidgetTester tester) async {
+    final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -581,6 +639,7 @@ void main() {
 
   testWidgets('Custom textInputAction results in keyboard with corresponding button', (WidgetTester tester) async {
     final _TestSearchDelegate delegate = _TestSearchDelegate(textInputAction: TextInputAction.done);
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
@@ -594,6 +653,7 @@ void main() {
   testWidgets('Custom flexibleSpace value', (WidgetTester tester) async {
     const Widget flexibleSpace = Text('custom flexibleSpace');
     final _TestSearchDelegate delegate = _TestSearchDelegate(flexibleSpace: flexibleSpace);
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(delegate: delegate));
     await tester.tap(find.byTooltip('Search'));
@@ -610,6 +670,8 @@ void main() {
       final bool isDesktop = debugDefaultTargetPlatformOverride == TargetPlatform.macOS ||
           debugDefaultTargetPlatformOverride == TargetPlatform.windows ||
           debugDefaultTargetPlatformOverride == TargetPlatform.linux;
+      final bool isCupertino = debugDefaultTargetPlatformOverride == TargetPlatform.iOS ||
+          debugDefaultTargetPlatformOverride == TargetPlatform.macOS;
       return TestSemantics.root(
         children: <TestSemantics>[
           TestSemantics(
@@ -642,7 +704,10 @@ void main() {
                                   SemanticsFlag.isEnabled,
                                   SemanticsFlag.isFocusable,
                                 ],
-                                actions: <SemanticsAction>[SemanticsAction.tap],
+                                actions: <SemanticsAction>[
+                                  SemanticsAction.tap,
+                                  if (defaultTargetPlatform != TargetPlatform.iOS) SemanticsAction.focus,
+                                ],
                                 tooltip: 'Back',
                                 textDirection: TextDirection.ltr,
                               ),
@@ -650,10 +715,11 @@ void main() {
                                 id: 9,
                                 flags: <SemanticsFlag>[
                                   SemanticsFlag.isTextField,
+                                  SemanticsFlag.hasEnabledState,
+                                  SemanticsFlag.isEnabled,
                                   SemanticsFlag.isFocused,
                                   SemanticsFlag.isHeader,
-                                  if (debugDefaultTargetPlatformOverride != TargetPlatform.iOS &&
-                                    debugDefaultTargetPlatformOverride != TargetPlatform.macOS) SemanticsFlag.namesRoute,
+                                  if (!isCupertino) SemanticsFlag.namesRoute,
                                 ],
                                 actions: <SemanticsAction>[
                                   if (isDesktop)
@@ -661,6 +727,7 @@ void main() {
                                   if (isDesktop)
                                     SemanticsAction.didLoseAccessibilityFocus,
                                   SemanticsAction.tap,
+                                  SemanticsAction.focus,
                                   SemanticsAction.setSelection,
                                   SemanticsAction.setText,
                                   SemanticsAction.paste,
@@ -696,7 +763,10 @@ void main() {
                           SemanticsFlag.isEnabled,
                           SemanticsFlag.isFocusable,
                         ],
-                        actions: <SemanticsAction>[SemanticsAction.tap],
+                        actions: <SemanticsAction>[
+                          SemanticsAction.tap,
+                          if (defaultTargetPlatform != TargetPlatform.iOS) SemanticsAction.focus,
+                        ],
                         label: 'Suggestions',
                         textDirection: TextDirection.ltr,
                       ),
@@ -713,6 +783,8 @@ void main() {
     testWidgets('includes routeName on Android', (WidgetTester tester) async {
       final SemanticsTester semantics = SemanticsTester(tester);
       final _TestSearchDelegate delegate = _TestSearchDelegate(flexibleSpace: flexibleSpace);
+      addTearDown(() => delegate.dispose());
+
       await tester.pumpWidget(TestHomePage(
         delegate: delegate,
       ));
@@ -733,6 +805,8 @@ void main() {
     testWidgets('does not include routeName', (WidgetTester tester) async {
       final SemanticsTester semantics = SemanticsTester(tester);
       final _TestSearchDelegate delegate = _TestSearchDelegate(flexibleSpace: flexibleSpace);
+      addTearDown(() => delegate.dispose());
+
       await tester.pumpWidget(TestHomePage(
         delegate: delegate,
       ));
@@ -757,6 +831,8 @@ void main() {
       final bool isDesktop = debugDefaultTargetPlatformOverride == TargetPlatform.macOS ||
                              debugDefaultTargetPlatformOverride == TargetPlatform.windows ||
                              debugDefaultTargetPlatformOverride == TargetPlatform.linux;
+      final bool isCupertino = debugDefaultTargetPlatformOverride == TargetPlatform.iOS ||
+          debugDefaultTargetPlatformOverride == TargetPlatform.macOS;
       return TestSemantics.root(
         children: <TestSemantics>[
           TestSemantics(
@@ -786,7 +862,10 @@ void main() {
                               SemanticsFlag.isEnabled,
                               SemanticsFlag.isFocusable,
                             ],
-                            actions: <SemanticsAction>[SemanticsAction.tap],
+                                actions: <SemanticsAction>[
+                                  SemanticsAction.tap,
+                                  if (defaultTargetPlatform != TargetPlatform.iOS) SemanticsAction.focus,
+                                ],
                             tooltip: 'Back',
                             textDirection: TextDirection.ltr,
                           ),
@@ -794,10 +873,11 @@ void main() {
                             id: 11,
                             flags: <SemanticsFlag>[
                               SemanticsFlag.isTextField,
+                              SemanticsFlag.hasEnabledState,
+                              SemanticsFlag.isEnabled,
                               SemanticsFlag.isFocused,
                               SemanticsFlag.isHeader,
-                              if (debugDefaultTargetPlatformOverride != TargetPlatform.iOS &&
-                                debugDefaultTargetPlatformOverride != TargetPlatform.macOS) SemanticsFlag.namesRoute,
+                              if (!isCupertino) SemanticsFlag.namesRoute,
                             ],
                             actions: <SemanticsAction>[
                               if (isDesktop)
@@ -805,6 +885,7 @@ void main() {
                               if (isDesktop)
                                 SemanticsAction.didLoseAccessibilityFocus,
                               SemanticsAction.tap,
+                              SemanticsAction.focus,
                               SemanticsAction.setSelection,
                               SemanticsAction.setText,
                               SemanticsAction.paste,
@@ -828,7 +909,10 @@ void main() {
                           SemanticsFlag.isEnabled,
                           SemanticsFlag.isFocusable,
                         ],
-                        actions: <SemanticsAction>[SemanticsAction.tap],
+                        actions: <SemanticsAction>[
+                          SemanticsAction.tap,
+                          if (defaultTargetPlatform != TargetPlatform.iOS) SemanticsAction.focus,
+                        ],
                         label: 'Suggestions',
                         textDirection: TextDirection.ltr,
                       ),
@@ -845,6 +929,8 @@ void main() {
     testWidgets('includes routeName on Android', (WidgetTester tester) async {
       final SemanticsTester semantics = SemanticsTester(tester);
       final _TestSearchDelegate delegate = _TestSearchDelegate();
+      addTearDown(() => delegate.dispose());
+
       await tester.pumpWidget(TestHomePage(
         delegate: delegate,
       ));
@@ -865,6 +951,8 @@ void main() {
     testWidgets('does not include routeName', (WidgetTester tester) async {
       final SemanticsTester semantics = SemanticsTester(tester);
       final _TestSearchDelegate delegate = _TestSearchDelegate();
+      addTearDown(() => delegate.dispose());
+
       await tester.pumpWidget(TestHomePage(
         delegate: delegate,
       ));
@@ -890,6 +978,7 @@ void main() {
     final _TestSearchDelegate delegate = _TestSearchDelegate(
       searchFieldDecorationTheme: searchFieldDecorationTheme,
     );
+    addTearDown(() => delegate.dispose());
 
     await tester.pumpWidget(TestHomePage(delegate: delegate));
     await tester.tap(find.byTooltip('Search'));
@@ -902,10 +991,10 @@ void main() {
   // Regression test for: https://github.com/flutter/flutter/issues/66781
   testWidgets('text in search bar contrasts background (light mode)', (WidgetTester tester) async {
     final ThemeData themeData = ThemeData(useMaterial3: false);
-    final _TestSearchDelegate delegate = _TestSearchDelegate(
-      defaultAppBarTheme: true,
-    );
+    final _TestSearchDelegate delegate = _TestSearchDelegate(defaultAppBarTheme: true);
+    addTearDown(() => delegate.dispose());
     const String query = 'search query';
+
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
       passInInitialQuery: true,
@@ -930,10 +1019,10 @@ void main() {
   // Regression test for: https://github.com/flutter/flutter/issues/66781
   testWidgets('text in search bar contrasts background (dark mode)', (WidgetTester tester) async {
     final ThemeData themeData = ThemeData.dark(useMaterial3: false);
-    final _TestSearchDelegate delegate = _TestSearchDelegate(
-      defaultAppBarTheme: true,
-    );
+    final _TestSearchDelegate delegate = _TestSearchDelegate(defaultAppBarTheme: true);
+    addTearDown(() => delegate.dispose());
     const String query = 'search query';
+
     await tester.pumpWidget(TestHomePage(
       delegate: delegate,
       passInInitialQuery: true,
@@ -960,6 +1049,7 @@ void main() {
     // The search delegate page is displayed with no issues
     // even with a null return values for [buildLeading], [buildActions] and [flexibleSpace].
     final _TestEmptySearchDelegate delegate = _TestEmptySearchDelegate();
+    addTearDown(delegate.dispose);
     final List<String> selectedResults = <String>[];
 
     await tester.pumpWidget(TestHomePage(
@@ -994,11 +1084,36 @@ void main() {
     expect(selectedResults, <String>['Result']);
   });
 
-  testWidgets('showSearch with useRootNavigator', (WidgetTester tester) async {
+  testWidgets('Leading width size is 16', (WidgetTester tester) async {
+    final _TestSearchDelegate delegate = _TestSearchDelegate();
+    final List<String> selectedResults = <String>[];
+    delegate.leadingWidth = 16;
+
+    await tester.pumpWidget(TestHomePage(
+      delegate: delegate,
+      results: selectedResults,
+    ));
+
+    // Open the search page with check leading width smaller than 16.
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+    await tester.tapAt(const Offset(16, 16));
+    expect(find.text('Suggestions'), findsOneWidget);
+    final Finder appBarFinder = find.byType(AppBar);
+    final AppBar appBar = tester.widget<AppBar>(appBarFinder);
+    expect(appBar.leadingWidth, 16);
+    await tester.tapAt(const Offset(8, 16));
+    await tester.pumpAndSettle();
+    expect(find.text('Suggestions'), findsNothing);
+    expect(find.text('HomeBody'), findsOneWidget);
+  });
+
+ testWidgets('showSearch with useRootNavigator', (WidgetTester tester) async {
     final _MyNavigatorObserver rootObserver = _MyNavigatorObserver();
     final _MyNavigatorObserver localObserver = _MyNavigatorObserver();
 
     final _TestEmptySearchDelegate delegate = _TestEmptySearchDelegate();
+    addTearDown(delegate.dispose);
 
     await tester.pumpWidget(MaterialApp(
       navigatorObservers: <NavigatorObserver>[rootObserver],
@@ -1034,20 +1149,33 @@ void main() {
     expect(rootObserver.pushCount, 0);
     expect(localObserver.pushCount, 0);
 
-    // showSearch normal and back
+    // showSearch normal and back.
     await tester.tap(find.text('showSearchLocalNavigator'));
     await tester.pumpAndSettle();
+    final Finder backButtonFinder = find.byType(BackButton);
+    expect(backButtonFinder, findsWidgets);
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
     expect(rootObserver.pushCount, 0);
     expect(localObserver.pushCount, 1);
 
-    // showSearch with rootNavigator
+    // showSearch with rootNavigator.
     await tester.tap(find.text('showSearchRootNavigator'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
-    expect(rootObserver.pushCount, 1);
+
+    // showSearch without back button.
+    delegate.automaticallyImplyLeading = false;
+    await tester.tap(find.text('showSearchRootNavigator'));
+    await tester.pumpAndSettle();
+    final Finder appBarFinder = find.byType(AppBar);
+    final AppBar appBar = tester.widget<AppBar>(appBarFinder);
+    expect(appBar.automaticallyImplyLeading, false);
+    expect(find.byTooltip('Back'), findsNothing);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(rootObserver.pushCount, 2);
     expect(localObserver.pushCount, 1);
   });
 
@@ -1055,6 +1183,7 @@ void main() {
     // This is a regression test for https://github.com/flutter/flutter/issues/95588
 
     final _TestSearchDelegate delegate = _TestSearchDelegate();
+    addTearDown(() => delegate.dispose());
     final List<String> selectedResults = <String>[];
 
     await tester.pumpWidget(TestHomePage(
@@ -1086,6 +1215,63 @@ void main() {
     await tester.pump();
     expect(textField.controller!.text.length, 15);
   }, skip: kIsWeb); // [intended] We do not use Flutter-rendered context menu on the Web.
+
+  testWidgets('showSearch with maintainState on the route', (WidgetTester tester) async {
+    final _MyNavigatorObserver navigationObserver = _MyNavigatorObserver();
+
+    final _TestEmptySearchDelegate delegate = _TestEmptySearchDelegate();
+    addTearDown(delegate.dispose);
+
+    await tester.pumpWidget(MaterialApp(
+      navigatorObservers: <NavigatorObserver>[navigationObserver],
+      home: Builder(builder: (BuildContext context) => Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          TextButton(
+            onPressed: () async {
+              await showSearch(
+                context: context,
+                delegate: delegate,
+              );
+            },
+            child: const Text('showSearch'),
+          ),
+          TextButton(
+            onPressed: () async {
+              await showSearch(
+                context: context,
+                delegate: delegate,
+                maintainState: true,
+              );
+            },
+            child: const Text('showSearchWithMaintainState'),
+          ),
+        ],
+      )),
+    ));
+
+    expect(navigationObserver.pushCount, 0);
+    expect(navigationObserver.maintainState, false);
+
+    // showSearch normal and back.
+    await tester.tap(find.text('showSearch'));
+    await tester.pumpAndSettle();
+    final Finder backButtonFinder = find.byType(BackButton);
+    expect(backButtonFinder, findsWidgets);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(navigationObserver.pushCount, 1);
+    expect(navigationObserver.maintainState, false);
+
+    // showSearch with maintainState.
+    await tester.tap(find.text('showSearchWithMaintainState'));
+    await tester.pumpAndSettle();
+    expect(backButtonFinder, findsWidgets);
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(navigationObserver.pushCount, 2);
+    expect(navigationObserver.maintainState, true);
+  });
 }
 
 class TestHomePage extends StatelessWidget {
@@ -1153,6 +1339,8 @@ class _TestSearchDelegate extends SearchDelegate<String> {
     super.searchFieldStyle,
     String? searchHint,
     super.textInputAction,
+    super.autocorrect,
+    super.enableSuggestions,
   }) : super(
           searchFieldLabel: searchHint,
         );
@@ -1269,6 +1457,7 @@ class _TestEmptySearchDelegate extends SearchDelegate<String> {
 }
 
 class _MyNavigatorObserver extends NavigatorObserver {
+  bool maintainState = false;
   int pushCount = 0;
 
   @override
@@ -1276,6 +1465,9 @@ class _MyNavigatorObserver extends NavigatorObserver {
     // don't count the root route
     if (<String>['nested', '/'].contains(route.settings.name)) {
       return;
+    }
+    if (route is PageRoute) {
+      maintainState = route.maintainState;
     }
     pushCount++;
   }

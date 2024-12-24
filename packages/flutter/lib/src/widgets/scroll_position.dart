@@ -2,6 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/material.dart';
+///
+/// @docImport 'page_view.dart';
+/// @docImport 'scroll_controller.dart';
+/// @docImport 'scroll_notification_observer.dart';
+/// @docImport 'scroll_position_with_single_context.dart';
+/// @docImport 'scroll_view.dart';
+/// @docImport 'scrollable.dart';
+/// @docImport 'viewport.dart';
+library;
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -270,6 +281,15 @@ abstract class ScrollPosition extends ViewportOffset with ScrollMetrics {
   bool get haveDimensions => _haveDimensions;
   bool _haveDimensions = false;
 
+  /// Whether scrollables should absorb pointer events at this position.
+  ///
+  /// This is value relates to the current [ScrollActivity], which determines
+  /// if additional touch input should be received by the scroll view or its children.
+  /// If the position is overscrolled, as is allowed by [BouncingScrollPhysics],
+  /// children of the scroll view will receive pointer events as the scroll view
+  /// settles back from the overscrolled state.
+  bool get shouldIgnorePointer => !outOfRange && (activity?.shouldIgnorePointer ?? true);
+
   /// Take any current applicable state from the given [ScrollPosition].
   ///
   /// This method is called by the constructor if it is given an `oldPosition`.
@@ -363,6 +383,9 @@ abstract class ScrollPosition extends ViewportOffset with ScrollMetrics {
       final double oldPixels = pixels;
       _pixels = newPixels - overscroll;
       if (_pixels != oldPixels) {
+        if (outOfRange) {
+          context.setIgnorePointer(false);
+        }
         notifyListeners();
         didUpdateScrollPositionBy(pixels - oldPixels);
       }
@@ -468,7 +491,7 @@ abstract class ScrollPosition extends ViewportOffset with ScrollMetrics {
     notifyListeners();
     SchedulerBinding.instance.addPostFrameCallback((Duration timeStamp) {
       _impliedVelocity = 0;
-    });
+    }, debugLabel: 'ScrollPosition.resetVelocity');
   }
 
   /// Called whenever scrolling ends, to store the current scroll offset in a
@@ -722,30 +745,17 @@ abstract class ScrollPosition extends ViewportOffset with ScrollMetrics {
   /// scroll view dimensions both change) and therefore shouldn't do anything
   /// expensive.
   void _updateSemanticActions() {
-    final SemanticsAction forward;
-    final SemanticsAction backward;
-    switch (axisDirection) {
-      case AxisDirection.up:
-        forward = SemanticsAction.scrollDown;
-        backward = SemanticsAction.scrollUp;
-      case AxisDirection.right:
-        forward = SemanticsAction.scrollLeft;
-        backward = SemanticsAction.scrollRight;
-      case AxisDirection.down:
-        forward = SemanticsAction.scrollUp;
-        backward = SemanticsAction.scrollDown;
-      case AxisDirection.left:
-        forward = SemanticsAction.scrollRight;
-        backward = SemanticsAction.scrollLeft;
-    }
+    final (SemanticsAction forward, SemanticsAction backward) = switch (axisDirection) {
+      AxisDirection.up    => (SemanticsAction.scrollDown, SemanticsAction.scrollUp),
+      AxisDirection.down  => (SemanticsAction.scrollUp, SemanticsAction.scrollDown),
+      AxisDirection.left  => (SemanticsAction.scrollRight, SemanticsAction.scrollLeft),
+      AxisDirection.right => (SemanticsAction.scrollLeft, SemanticsAction.scrollRight),
+    };
 
-    final Set<SemanticsAction> actions = <SemanticsAction>{};
-    if (pixels > minScrollExtent) {
-      actions.add(backward);
-    }
-    if (pixels < maxScrollExtent) {
-      actions.add(forward);
-    }
+    final Set<SemanticsAction> actions = <SemanticsAction>{
+      if (pixels > minScrollExtent) backward,
+      if (pixels < maxScrollExtent) forward,
+    };
 
     if (setEquals<SemanticsAction>(actions, _semanticActions)) {
       return;
@@ -795,9 +805,13 @@ abstract class ScrollPosition extends ViewportOffset with ScrollMetrics {
     Curve curve = Curves.ease,
     ScrollPositionAlignmentPolicy alignmentPolicy = ScrollPositionAlignmentPolicy.explicit,
     RenderObject? targetRenderObject,
-  }) {
+  }) async {
     assert(object.attached);
-    final RenderAbstractViewport viewport = RenderAbstractViewport.of(object);
+    final RenderAbstractViewport? viewport = RenderAbstractViewport.maybeOf(object);
+    // If no viewport is found, return.
+    if (viewport == null) {
+      return;
+    }
 
     Rect? targetRect;
     if (targetRenderObject != null && targetRenderObject != object) {
@@ -842,12 +856,12 @@ abstract class ScrollPosition extends ViewportOffset with ScrollMetrics {
     }
 
     if (target == pixels) {
-      return Future<void>.value();
+      return;
     }
 
     if (duration == Duration.zero) {
       jumpTo(target);
-      return Future<void>.value();
+      return;
     }
 
     return animateTo(target, duration: duration, curve: curve);
@@ -858,6 +872,16 @@ abstract class ScrollPosition extends ViewportOffset with ScrollMetrics {
   ///
   /// Listeners added by stateful widgets should be removed in the widget's
   /// [State.dispose] method.
+  ///
+  /// {@tool dartpad}
+  /// This sample shows how you can trigger an auto-scroll, which aligns the last
+  /// partially visible fixed-height list item, by listening to this
+  /// notifier's value. This sort of thing can also be done by listening for
+  /// [ScrollEndNotification]s with a [NotificationListener]. An alternative
+  /// example is provided with [ScrollEndNotification].
+  ///
+  /// ** See code in examples/api/lib/widgets/scroll_position/is_scrolling_listener.0.dart **
+  /// {@end-tool}
   final ValueNotifier<bool> isScrollingNotifier = ValueNotifier<bool>(false);
 
   /// Animates the position from its current value to the given value.

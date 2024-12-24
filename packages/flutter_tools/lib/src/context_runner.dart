@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
-
 import 'dart:async';
 
 import 'package:process/process.dart';
@@ -43,9 +41,6 @@ import 'flutter_application_package.dart';
 import 'flutter_cache.dart';
 import 'flutter_device_manager.dart';
 import 'flutter_features.dart';
-import 'fuchsia/fuchsia_device.dart' show FuchsiaDeviceTools;
-import 'fuchsia/fuchsia_sdk.dart' show FuchsiaArtifacts, FuchsiaSdk;
-import 'fuchsia/fuchsia_workflow.dart' show FuchsiaWorkflow, fuchsiaWorkflow;
 import 'globals.dart' as globals;
 import 'ios/ios_workflow.dart';
 import 'ios/iproxy.dart';
@@ -84,6 +79,8 @@ Future<T> runInContext<T>(
     return runner();
   }
 
+  // TODO(ianh): We should split this into two, one for tests (which should be
+  // in test/), and one for production (which should be in executable.dart).
   return context.run<T>(
     name: 'global fallbacks',
     body: runnerWrapper,
@@ -93,6 +90,8 @@ Future<T> runInContext<T>(
         runningOnBot: runningOnBot,
         flutterVersion: globals.flutterVersion,
         environment: globals.platform.environment,
+        clientIde: globals.platform.environment['FLUTTER_HOST'],
+        config: globals.config,
       ),
       AndroidBuilder: () => AndroidGradleBuilder(
         java: globals.java,
@@ -100,7 +99,7 @@ Future<T> runInContext<T>(
         processManager: globals.processManager,
         fileSystem: globals.fs,
         artifacts: globals.artifacts!,
-        usage: globals.flutterUsage,
+        analytics: globals.analytics,
         gradleUtils: globals.gradleUtils!,
         platform: globals.platform,
         androidStudio: globals.androidStudio,
@@ -166,6 +165,7 @@ Future<T> runInContext<T>(
         platform: globals.platform,
         xcodeProjectInterpreter: globals.xcodeProjectInterpreter!,
         usage: globals.flutterUsage,
+        analytics: globals.analytics,
       ),
       CocoaPodsValidator: () => CocoaPodsValidator(
         globals.cocoaPods!,
@@ -200,7 +200,6 @@ Future<T> runInContext<T>(
         artifacts: globals.artifacts!,
         flutterVersion: globals.flutterVersion,
         androidWorkflow: androidWorkflow!,
-        fuchsiaWorkflow: fuchsiaWorkflow!,
         xcDevice: globals.xcdevice!,
         userMessages: globals.userMessages,
         windowsWorkflow: windowsWorkflow!,
@@ -208,17 +207,20 @@ Future<T> runInContext<T>(
           platform: globals.platform,
           featureFlags: featureFlags,
         ),
-        fuchsiaSdk: globals.fuchsiaSdk!,
         operatingSystemUtils: globals.os,
         customDevicesConfig: globals.customDevicesConfig,
+        nativeAssetsBuilder: globals.nativeAssetsBuilder,
       ),
       DevtoolsLauncher: () => DevtoolsServerLauncher(
         processManager: globals.processManager,
-        dartExecutable: globals.artifacts!.getArtifactPath(Artifact.engineDartBinary),
+        artifacts: globals.artifacts!,
         logger: globals.logger,
         botDetector: globals.botDetector,
       ),
-      Doctor: () => Doctor(logger: globals.logger),
+      Doctor: () => Doctor(
+        logger: globals.logger,
+        clock: globals.systemClock,
+      ),
       DoctorValidatorsProvider: () => DoctorValidatorsProvider.defaultInstance,
       EmulatorManager: () => EmulatorManager(
         java: globals.java,
@@ -236,14 +238,6 @@ Future<T> runInContext<T>(
       FlutterVersion: () => FlutterVersion(
         fs: globals.fs,
         flutterRoot: Cache.flutterRoot!,
-      ),
-      FuchsiaArtifacts: () => FuchsiaArtifacts.find(),
-      FuchsiaDeviceTools: () => FuchsiaDeviceTools(),
-      FuchsiaSdk: () => FuchsiaSdk(),
-      FuchsiaWorkflow: () => FuchsiaWorkflow(
-        featureFlags: featureFlags,
-        platform: globals.platform,
-        fuchsiaArtifacts: globals.fuchsiaArtifacts!,
       ),
       GradleUtils: () => GradleUtils(
         operatingSystemUtils: globals.os,
@@ -271,7 +265,7 @@ Future<T> runInContext<T>(
         processManager: globals.processManager
       ),
       LocalEngineLocator: () => LocalEngineLocator(
-        userMessages: userMessages,
+        userMessages: globals.userMessages,
         logger: globals.logger,
         platform: globals.platform,
         fileSystem: globals.fs,
@@ -295,6 +289,7 @@ Future<T> runInContext<T>(
       MDnsVmServiceDiscovery: () => MDnsVmServiceDiscovery(
         logger: globals.logger,
         flutterUsage: globals.flutterUsage,
+        analytics: globals.analytics,
       ),
       OperatingSystemUtils: () => OperatingSystemUtils(
         fileSystem: globals.fs,
@@ -343,6 +338,7 @@ Future<T> runInContext<T>(
           platform: globals.platform,
           logger: globals.logger,
           processManager: globals.processManager,
+          osUtils: globals.os,
         )
       ),
       WebWorkflow: () => WebWorkflow(
@@ -377,6 +373,7 @@ Future<T> runInContext<T>(
           dyLdLibEntry: globals.cache.dyLdLibEntry,
         ),
         fileSystem: globals.fs,
+        analytics: globals.analytics,
       ),
       XcodeProjectInterpreter: () => XcodeProjectInterpreter(
         logger: globals.logger,
@@ -384,6 +381,7 @@ Future<T> runInContext<T>(
         platform: globals.platform,
         fileSystem: globals.fs,
         usage: globals.flutterUsage,
+        analytics: globals.analytics,
       ),
     },
   );

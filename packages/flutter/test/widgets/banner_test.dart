@@ -246,7 +246,7 @@ void main() {
     expect(rotateCommand.positionalArguments[0], equals(math.pi / 4.0));
   });
 
-  testWidgetsWithLeakTracking('Banner widget', (WidgetTester tester) async {
+  testWidgets('Banner widget', (WidgetTester tester) async {
     debugDisableShadows = false;
     await tester.pumpWidget(
       const Directionality(
@@ -266,7 +266,7 @@ void main() {
     debugDisableShadows = true;
   });
 
-  testWidgetsWithLeakTracking('Banner widget in MaterialApp', (WidgetTester tester) async {
+  testWidgets('Banner widget in MaterialApp', (WidgetTester tester) async {
     debugDisableShadows = false;
     await tester.pumpWidget(const MaterialApp(home: Placeholder()));
     expect(find.byType(CheckedModeBanner), paints
@@ -278,6 +278,48 @@ void main() {
       ..paragraph(offset: const Offset(-40.0, 29.0))
       ..restore(),
     );
+    debugDisableShadows = true;
+  });
+
+  test('BannerPainter dispatches memory events', () async {
+    await expectLater(
+      await memoryEvents(
+        () => BannerPainter(
+          message: 'foo',
+          textDirection: TextDirection.rtl,
+          location: BannerLocation.topStart,
+          layoutDirection: TextDirection.ltr,
+        ).dispose(),
+        BannerPainter,
+      ),
+      areCreateAndDispose,
+    );
+  });
+
+  testWidgets('Can configure shadow for Banner widget', (WidgetTester tester) async {
+    debugDisableShadows = false;
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: Banner(
+          message: 'Shadow banner',
+          location: BannerLocation.topEnd,
+          shadow: BoxShadow(
+            color: Color(0xFF008000),
+            blurRadius: 8.0,
+          ),
+        ),
+      ),
+    );
+    final Finder customPaint = find.byType(CustomPaint);
+
+    expect(customPaint, findsOneWidget);
+
+    final CustomPaint paintWidget = tester.widget(customPaint);
+    final BannerPainter painter = paintWidget.foregroundPainter! as BannerPainter;
+
+    expect(painter.shadow.color, const Color(0xFF008000));
+    expect(painter.shadow.blurRadius, 8.0);
     debugDisableShadows = true;
   });
 }

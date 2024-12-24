@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'elevated_button_theme.dart';
+/// @docImport 'menu_anchor.dart';
+/// @docImport 'text_button_theme.dart';
+/// @docImport 'text_theme.dart';
+/// @docImport 'theme.dart';
+library;
+
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -11,10 +18,46 @@ import 'package:flutter/widgets.dart';
 import 'button_style.dart';
 import 'colors.dart';
 import 'constants.dart';
+import 'elevated_button.dart';
+import 'filled_button.dart';
 import 'ink_well.dart';
 import 'material.dart';
 import 'material_state.dart';
+import 'outlined_button.dart';
+import 'text_button.dart';
 import 'theme_data.dart';
+import 'tooltip.dart';
+
+/// {@template flutter.material.ButtonStyleButton.iconAlignment}
+/// Determines the alignment of the icon within the widgets such as:
+///   - [ElevatedButton.icon],
+///   - [FilledButton.icon],
+///   - [FilledButton.tonalIcon].
+///   - [OutlinedButton.icon],
+///   - [TextButton.icon],
+///
+/// The effect of `iconAlignment` depends on [TextDirection]. If textDirection is
+/// [TextDirection.ltr] then [IconAlignment.start] and [IconAlignment.end] align the
+/// icon on the left or right respectively.  If textDirection is [TextDirection.rtl] the
+/// the alignments are reversed.
+///
+/// Defaults to [IconAlignment.start].
+///
+/// {@tool dartpad}
+/// This sample demonstrates how to use `iconAlignment` to align the button icon to the start
+/// or the end of the button.
+///
+/// ** See code in examples/api/lib/material/button_style_button/button_style_button.icon_alignment.0.dart **
+/// {@end-tool}
+///
+/// {@endtemplate}
+enum IconAlignment {
+  /// The icon is placed at the start of the button.
+  start,
+
+  /// The icon is placed at the end of the button.
+  end,
+}
 
 /// The base [StatefulWidget] class for buttons whose style is defined by a [ButtonStyle] object.
 ///
@@ -43,6 +86,8 @@ abstract class ButtonStyleButton extends StatefulWidget {
     required this.clipBehavior,
     this.statesController,
     this.isSemanticButton = true,
+    this.iconAlignment = IconAlignment.start,
+    this.tooltip,
     required this.child,
   });
 
@@ -80,17 +125,19 @@ abstract class ButtonStyleButton extends StatefulWidget {
   /// Customizes this button's appearance.
   ///
   /// Non-null properties of this style override the corresponding
-  /// properties in [themeStyleOf] and [defaultStyleOf]. [MaterialStateProperty]s
+  /// properties in [themeStyleOf] and [defaultStyleOf]. [WidgetStateProperty]s
   /// that resolve to non-null values will similarly override the corresponding
-  /// [MaterialStateProperty]s in [themeStyleOf] and [defaultStyleOf].
+  /// [WidgetStateProperty]s in [themeStyleOf] and [defaultStyleOf].
   ///
   /// Null by default.
   final ButtonStyle? style;
 
   /// {@macro flutter.material.Material.clipBehavior}
   ///
-  /// Defaults to [Clip.none].
-  final Clip clipBehavior;
+  /// Defaults to [Clip.none] unless [ButtonStyle.backgroundBuilder] or
+  /// [ButtonStyle.foregroundBuilder] is specified. In those
+  /// cases the default is [Clip.antiAlias].
+  final Clip? clipBehavior;
 
   /// {@macro flutter.widgets.Focus.focusNode}
   final FocusNode? focusNode;
@@ -110,27 +157,56 @@ abstract class ButtonStyleButton extends StatefulWidget {
   /// Defaults to true.
   final bool? isSemanticButton;
 
+  /// {@macro flutter.material.ButtonStyleButton.iconAlignment}
+  final IconAlignment iconAlignment;
+
+  /// Text that describes the action that will occur when the button is pressed or
+  /// hovered over.
+  ///
+  /// This text is displayed when the user long-presses or hovers over the button
+  /// in a tooltip. This string is also used for accessibility.
+  ///
+  /// If null, the button will not display a tooltip.
+  final String? tooltip;
+
   /// Typically the button's label.
   ///
   /// {@macro flutter.widgets.ProxyWidget.child}
   final Widget? child;
 
-  /// Returns a non-null [ButtonStyle] that's based primarily on the [Theme]'s
-  /// [ThemeData.textTheme] and [ThemeData.colorScheme].
+  /// Returns a [ButtonStyle] that's based primarily on the [Theme]'s
+  /// [ThemeData.textTheme] and [ThemeData.colorScheme], but has most values
+  /// filled out (non-null).
   ///
-  /// The returned style can be overridden by the [style] parameter and
-  /// by the style returned by [themeStyleOf]. For example the default
-  /// style of the [TextButton] subclass can be overridden with its
-  /// [TextButton.style] constructor parameter, or with a
-  /// [TextButtonTheme].
+  /// The returned style can be overridden by the [style] parameter and by the
+  /// style returned by [themeStyleOf] that some button-specific themes like
+  /// [TextButtonTheme] or [ElevatedButtonTheme] override. For example the
+  /// default style of the [TextButton] subclass can be overridden with its
+  /// [TextButton.style] constructor parameter, or with a [TextButtonTheme].
   ///
-  /// Concrete button subclasses should return a ButtonStyle that
-  /// has no null properties, and where all of the [MaterialStateProperty]
-  /// properties resolve to non-null values.
+  /// Concrete button subclasses should return a [ButtonStyle] with as many
+  /// non-null properties as possible, where all of the non-null
+  /// [WidgetStateProperty] properties resolve to non-null values.
+  ///
+  /// ## Properties that can be null
+  ///
+  /// Some properties, like [ButtonStyle.fixedSize] would override other values
+  /// in the same [ButtonStyle] if set, so they are allowed to be null.  Here is
+  /// a summary of properties that are allowed to be null when returned in the
+  /// [ButtonStyle] returned by this function, an why:
+  ///
+  /// - [ButtonStyle.fixedSize] because it would override other values in the
+  ///   same [ButtonStyle], like [ButtonStyle.maximumSize].
+  /// - [ButtonStyle.side] because null is a valid value for a button that has
+  ///   no side. [OutlinedButton] returns a non-null default for this, however.
+  /// - [ButtonStyle.backgroundBuilder] and [ButtonStyle.foregroundBuilder]
+  ///   because they would override the [ButtonStyle.foregroundColor] and
+  ///   [ButtonStyle.backgroundColor] of the same [ButtonStyle].
   ///
   /// See also:
   ///
-  ///  * [themeStyleOf], Returns the ButtonStyle of this button's component theme.
+  /// * [themeStyleOf], returns the ButtonStyle of this button's component
+  ///   theme.
   @protected
   ButtonStyle defaultStyleOf(BuildContext context);
 
@@ -165,29 +241,56 @@ abstract class ButtonStyleButton extends StatefulWidget {
     properties.add(DiagnosticsProperty<FocusNode>('focusNode', focusNode, defaultValue: null));
   }
 
-  /// Returns null if [value] is null, otherwise `MaterialStatePropertyAll<T>(value)`.
+  /// Returns null if [value] is null, otherwise `WidgetStatePropertyAll<T>(value)`.
   ///
   /// A convenience method for subclasses.
   static MaterialStateProperty<T>? allOrNull<T>(T? value) => value == null ? null : MaterialStatePropertyAll<T>(value);
 
-  /// Returns an interpolated value based on the [textScaleFactor] parameter:
-  ///
-  ///  * 0 - 1 [geometry1x]
-  ///  * 1 - 2 lerp([geometry1x], [geometry2x], [textScaleFactor] - 1)
-  ///  * 2 - 3 lerp([geometry2x], [geometry3x], [textScaleFactor] - 2)
-  ///  * otherwise [geometry3x]
+  /// Returns null if [enabled] and [disabled] are null.
+  /// Otherwise, returns a [WidgetStateProperty] that resolves to [disabled]
+  /// when [WidgetState.disabled] is active, and [enabled] otherwise.
   ///
   /// A convenience method for subclasses.
+  static WidgetStateProperty<Color?>? defaultColor(Color? enabled, Color? disabled) {
+    if ((enabled ?? disabled) == null) {
+      return null;
+    }
+    return WidgetStateProperty<Color?>.fromMap(
+      <WidgetStatesConstraint, Color?>{
+        WidgetState.disabled: disabled,
+        WidgetState.any: enabled,
+      },
+    );
+  }
+
+  /// A convenience method used by subclasses in the framework, that returns an
+  /// interpolated value based on the [fontSizeMultiplier] parameter:
+  ///
+  ///  * 0 - 1 [geometry1x]
+  ///  * 1 - 2 lerp([geometry1x], [geometry2x], [fontSizeMultiplier] - 1)
+  ///  * 2 - 3 lerp([geometry2x], [geometry3x], [fontSizeMultiplier] - 2)
+  ///  * otherwise [geometry3x]
+  ///
+  /// This method is used by the framework for estimating the default paddings to
+  /// use on a button with a text label, when the system text scaling setting
+  /// changes. It's usually supplied with empirical [geometry1x], [geometry2x],
+  /// [geometry3x] values adjusted for different system text scaling values, when
+  /// the unscaled font size is set to 14.0 (the default [TextTheme.labelLarge]
+  /// value).
+  ///
+  /// The `fontSizeMultiplier` argument, for historical reasons, is the default
+  /// font size specified in the [ButtonStyle], scaled by the ambient font
+  /// scaler, then divided by 14.0 (the default font size used in buttons).
   static EdgeInsetsGeometry scaledPadding(
     EdgeInsetsGeometry geometry1x,
     EdgeInsetsGeometry geometry2x,
     EdgeInsetsGeometry geometry3x,
-    double textScaleFactor,
+    double fontSizeMultiplier,
   ) {
-    return switch (textScaleFactor) {
+    return switch (fontSizeMultiplier) {
       <= 1 => geometry1x,
-      < 2  => EdgeInsetsGeometry.lerp(geometry1x, geometry2x, textScaleFactor - 1)!,
-      < 3  => EdgeInsetsGeometry.lerp(geometry2x, geometry3x, textScaleFactor - 2)!,
+      < 2  => EdgeInsetsGeometry.lerp(geometry1x, geometry2x, fontSizeMultiplier - 1)!,
+      < 3  => EdgeInsetsGeometry.lerp(geometry2x, geometry3x, fontSizeMultiplier - 2)!,
       _    => geometry3x,
     };
   }
@@ -308,6 +411,11 @@ class _ButtonStyleState extends State<ButtonStyleButton> with TickerProviderStat
     final AlignmentGeometry? resolvedAlignment = effectiveValue((ButtonStyle? style) => style?.alignment);
     final Offset densityAdjustment = resolvedVisualDensity!.baseSizeAdjustment;
     final InteractiveInkFeatureFactory? resolvedSplashFactory = effectiveValue((ButtonStyle? style) => style?.splashFactory);
+    final ButtonLayerBuilder? resolvedBackgroundBuilder = effectiveValue((ButtonStyle? style) => style?.backgroundBuilder);
+    final ButtonLayerBuilder? resolvedForegroundBuilder = effectiveValue((ButtonStyle? style) => style?.foregroundBuilder);
+
+    final Clip effectiveClipBehavior = widget.clipBehavior
+      ?? ((resolvedBackgroundBuilder ?? resolvedForegroundBuilder) != null ? Clip.antiAlias : Clip.none);
 
     BoxConstraints effectiveConstraints = resolvedVisualDensity.effectiveConstraints(
       BoxConstraints(
@@ -341,7 +449,7 @@ class _ButtonStyleState extends State<ButtonStyleButton> with TickerProviderStat
     final double dx = math.max(0, densityAdjustment.dx);
     final EdgeInsetsGeometry padding = resolvedPadding!
       .add(EdgeInsets.fromLTRB(dx, dy, dx, dy))
-      .clamp(EdgeInsets.zero, EdgeInsetsGeometry.infinity); // ignore_clamp_double_lint
+      .clamp(EdgeInsets.zero, EdgeInsetsGeometry.infinity);
 
     // If an opaque button's background is becoming translucent while its
     // elevation is changing, change the elevation first. Material implicitly
@@ -374,6 +482,28 @@ class _ButtonStyleState extends State<ButtonStyleButton> with TickerProviderStat
     elevation = resolvedElevation;
     backgroundColor = resolvedBackgroundColor;
 
+    Widget effectiveChild = Padding(
+      padding: padding,
+      child: Align(
+        alignment: resolvedAlignment!,
+        widthFactor: 1.0,
+        heightFactor: 1.0,
+        child: resolvedForegroundBuilder != null
+          ? resolvedForegroundBuilder(context, statesController.value, widget.child)
+          : widget.child,
+      ),
+    );
+    if (resolvedBackgroundBuilder != null) {
+      effectiveChild = resolvedBackgroundBuilder(context, statesController.value, effectiveChild);
+    }
+
+    if (widget.tooltip != null) {
+      effectiveChild = Tooltip(
+        message: widget.tooltip,
+        child: effectiveChild,
+      );
+    }
+
     final Widget result = ConstrainedBox(
       constraints: effectiveConstraints,
       child: Material(
@@ -385,7 +515,7 @@ class _ButtonStyleState extends State<ButtonStyleButton> with TickerProviderStat
         surfaceTintColor: resolvedSurfaceTintColor,
         type: resolvedBackgroundColor == null ? MaterialType.transparency : MaterialType.button,
         animationDuration: resolvedAnimationDuration,
-        clipBehavior: widget.clipBehavior,
+        clipBehavior: effectiveClipBehavior,
         child: InkWell(
           onTap: widget.onPressed,
           onLongPress: widget.onLongPress,
@@ -402,16 +532,11 @@ class _ButtonStyleState extends State<ButtonStyleButton> with TickerProviderStat
           customBorder: resolvedShape.copyWith(side: resolvedSide),
           statesController: statesController,
           child: IconTheme.merge(
-            data: IconThemeData(color: resolvedIconColor ?? resolvedForegroundColor, size: resolvedIconSize),
-            child: Padding(
-              padding: padding,
-              child: Align(
-                alignment: resolvedAlignment!,
-                widthFactor: 1.0,
-                heightFactor: 1.0,
-                child: widget.child,
-              ),
+            data: IconThemeData(
+              color: resolvedIconColor ?? resolvedForegroundColor,
+              size: resolvedIconSize,
             ),
+            child: effectiveChild,
           ),
         ),
       ),
@@ -539,6 +664,20 @@ class _RenderInputPadding extends RenderShiftedBox {
       constraints: constraints,
       layoutChild: ChildLayoutHelper.dryLayoutChild,
     );
+  }
+
+  @override
+  double? computeDryBaseline(covariant BoxConstraints constraints, TextBaseline baseline) {
+    final RenderBox? child = this.child;
+    if (child == null) {
+      return null;
+    }
+    final double? result = child.getDryBaseline(constraints, baseline);
+    if (result == null) {
+      return null;
+    }
+    final Size childSize = child.getDryLayout(constraints);
+    return result + Alignment.center.alongOffset(getDryLayout(constraints) - childSize as Offset).dy;
   }
 
   @override

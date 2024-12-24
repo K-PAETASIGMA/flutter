@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 import 'package:file/memory.dart';
+import 'package:flutter_tools/src/artifacts.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
+import 'package:flutter_tools/src/base/process.dart';
 import 'package:flutter_tools/src/build_system/build_system.dart';
 import 'package:flutter_tools/src/cache.dart';
 import 'package:flutter_tools/src/commands/build.dart';
@@ -26,14 +28,24 @@ void main() {
     late File registrant;
 
     // Environment overrides
+    late Artifacts artifacts;
     late FileSystem fileSystem;
     late ProcessManager processManager;
     late BuildSystem buildSystem;
+    late ProcessUtils processUtils;
+    late BufferLogger logger;
 
     setUp(() {
       // Prepare environment overrides
       fileSystem = MemoryFileSystem.test();
+      artifacts = Artifacts.test(fileSystem: fileSystem);
       processManager = FakeProcessManager.any();
+      logger = BufferLogger.test();
+      processUtils = ProcessUtils(
+        processManager: processManager,
+        logger: logger,
+      );
+
       buildSystem = TestBuildSystem.all(BuildResult(success: true));
       // Write some initial state into our testing filesystem
       setupFileSystemForEndToEndTest(fileSystem);
@@ -47,11 +59,13 @@ void main() {
       expect(registrant.existsSync(), isFalse);
 
       await createTestCommandRunner(BuildCommand(
+        artifacts: artifacts,
         androidSdk: FakeAndroidSdk(),
         buildSystem: buildSystem,
         fileSystem: fileSystem,
         logger: BufferLogger.test(),
         osUtils: FakeOperatingSystemUtils(),
+        processUtils: processUtils,
       ))
           .run(<String>['build', 'web', '--no-pub']);
 
@@ -70,11 +84,13 @@ void main() {
       expect(contentsBeforeBuild, isNot(contains('lib/generated_plugin_registrant.dart')));
 
       await createTestCommandRunner(BuildCommand(
+        artifacts: artifacts,
         androidSdk: FakeAndroidSdk(),
         buildSystem: buildSystem,
         fileSystem: fileSystem,
-        logger: BufferLogger.test(),
+        logger: logger,
         osUtils: FakeOperatingSystemUtils(),
+        processUtils: processUtils,
       ))
           .run(<String>['build', 'web', '--no-pub']);
 
@@ -92,10 +108,12 @@ void main() {
       expect(gitignore.readAsStringSync(), contains('lib/generated_plugin_registrant.dart'));
 
       await createTestCommandRunner(BuildCommand(
+        artifacts: artifacts,
         androidSdk: FakeAndroidSdk(),
         buildSystem: buildSystem,
         fileSystem: fileSystem,
-        logger: BufferLogger.test(),
+        logger: logger,
+        processUtils: processUtils,
         osUtils: FakeOperatingSystemUtils(),
       ))
           .run(<String>['build', 'web', '--no-pub']);
@@ -113,10 +131,12 @@ void main() {
       expect(registrant.existsSync(), isTrue);
 
       await createTestCommandRunner(BuildCommand(
+        artifacts: artifacts,
         androidSdk: FakeAndroidSdk(),
         buildSystem: buildSystem,
         fileSystem: fileSystem,
-        logger: BufferLogger.test(),
+        logger: logger,
+        processUtils: processUtils,
         osUtils: FakeOperatingSystemUtils(),
       ))
           .run(<String>['build', 'web', '--no-pub']);
@@ -136,10 +156,12 @@ void main() {
       expect(gitignore.readAsStringSync(), contains('lib/generated_plugin_registrant.dart'));
 
       await createTestCommandRunner(BuildCommand(
+        artifacts: artifacts,
         androidSdk: FakeAndroidSdk(),
         buildSystem: buildSystem,
         fileSystem: fileSystem,
-        logger: BufferLogger.test(),
+        logger: logger,
+        processUtils: processUtils,
         osUtils: FakeOperatingSystemUtils(),
       ))
           .run(<String>['build', 'web', '--no-pub']);
@@ -178,7 +200,7 @@ void writeGeneratedPluginRegistrant(FileSystem fs) {
 // (taken from commands.shard/hermetic/build_web_test.dart)
 void setupFileSystemForEndToEndTest(FileSystem fileSystem) {
   final List<String> dependencies = <String>[
-    '.packages',
+    fileSystem.path.join('.dart_tool', 'package_config.json'),
     fileSystem.path.join('web', 'index.html'),
     fileSystem.path.join('lib', 'main.dart'),
     fileSystem.path.join('packages', 'flutter_tools', 'lib', 'src', 'build_system', 'targets', 'web.dart'),
@@ -192,11 +214,6 @@ void setupFileSystemForEndToEndTest(FileSystem fileSystem) {
   }
 
   // Project files.
-  fileSystem.file('.packages')
-      .writeAsStringSync('''
-foo:lib/
-fizz:bar/lib/
-''');
   fileSystem.file('pubspec.yaml')
       .writeAsStringSync('''
 name: foo
